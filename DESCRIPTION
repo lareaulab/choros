@@ -1,11 +1,19 @@
 Package: choros
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Bias Correction for Ribosome Profiling Data
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
+Authors@R: c(person("Amanda", "Mok", role=c("aut", "cre"),
+                    email="a.mok@berkeley.edu"),
+             person("Liana", "Lareau", role="aut", 
+                    email="lareau@berkeley.edu"))
+Author: Amanda Mok [aut, cre],
+    Liana Lareau [aut]
+Maintainer: Amanda Mok <a.mok@berkeley.edu>
 Description: More about what it does (maybe more than one line)
     Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+License: TBD
 Encoding: UTF-8
 LazyData: true
+Depends: parallel, doParallel, foreach, reshape, prodlim, Rsamtools, 
+    ggplot2, MASS, knitr, rmarkdown
+VignetteBuilder: knitr, rmarkdown

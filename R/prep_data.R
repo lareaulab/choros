@@ -228,5 +228,6 @@ count_footprints <- function(bam_dat, regression_data, which_column="count", nt_
   match_rows <- prodlim::row.match(regression_data[, features], bam_dat[, features])
   counts <- bam_dat[match_rows, which_column]
   counts[is.na(counts)] <- 0
+  counts <- round(counts, digits=0) # return integer counts for glm.nb()
   return(counts)
 }

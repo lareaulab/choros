@@ -1,1 +1,12 @@
-exportPattern("^[[:alpha:]]+")
+# export functions
+export('load_bam', 'count_d5_d3', 'init_data', 'count_footprints',
+       'correct_bias', 'evaluate_bias', 'plot_bias')
+# import packages
+importFrom('parallel', 'makeCluster', 'stopCluster')
+importFrom('doParallel', "registerDoParallel")
+import('foreach')
+importFrom('reshape', 'expand.grid.df')
+importFrom('prodlim', 'row.match')
+importFrom('Rsamtools', 'BamFile', 'ScanBamParam', 'scanBam')
+import('ggplot2')
+importFrom('MASS', 'glm.nb')

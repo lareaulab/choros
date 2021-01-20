@@ -26,7 +26,7 @@ correct_bias_sim <- function(dat, p5bias, n3bias, which_column="count",
   return(corrected_count)
 }
 
-correct_bias <- function(dat, fit, which_column="count",
+correct_bias_noInteraction <- function(dat, fit, which_column="count",
                          which_f5="genome_f5", which_f3="genome_f3",
                          fit_f5="genome_f5", fit_f3="genome_f3") {
   # predict counts if bias sequences were set to reference level, allowing residuals
@@ -56,7 +56,7 @@ correct_bias <- function(dat, fit, which_column="count",
   return(corrected_count)
 }
 
-correct_bias_interxn <- function(dat, intrxn_fit, which_column="count",
+correct_bias <- function(dat, intrxn_fit, which_column="count",
                                  which_f5="genome_f5", which_f3="genome_f3",
                                  fit_f5="genome_f5", fit_f3="genome_f3") {
   # correct biased counts with coefficients from interaction regression model

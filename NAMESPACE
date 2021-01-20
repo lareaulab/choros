@@ -1,6 +1,7 @@
 # export functions
 export('load_bam', 'count_d5_d3', 'init_data', 'count_footprints',
-       'correct_bias', 'evaluate_bias', 'plot_bias')
+       'correct_bias', 'evaluate_bias', 'plot_bias',
+       'load_lengths', 'load_gff')
 # import packages
 importFrom('parallel', 'makeCluster', 'stopCluster')
 importFrom('doParallel', "registerDoParallel")

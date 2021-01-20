@@ -8,6 +8,36 @@ load_lengths <- function(lengths_fname) {
   return(transcript_lengths)
 }
 
+load_gff <- function(gff_fname) {
+  # load gff annotation file of gene regions
+  ## gff_fname: character; file path to gff annotation file
+  ## gff file requirements:
+  ## - first column is transcript name
+  ## - third column is one of UTR5, CDS, UTR3
+  gff <- read.table(gff_fname, col.names=c("seqid", "source", "type", "start", "end",
+                                           "score", "strand", "phase", "attributes"),
+                    stringsAsFactors=F)
+  transcripts <- unique(gff$seqid)
+  transcript_lengths <- data.frame(transcript = transcripts,
+                                   utr5_length = sapply(transcripts,
+                                                        function(x) {
+                                                          dat <- subset(gff, seqid==x & type=="UTR5")
+                                                          return(dat$end - dat$start + 1)
+                                                        }),
+                                   cds_length = sapply(transcripts,
+                                                       function(x) {
+                                                         dat <- subset(gff, seqid==x & type=="CDS")
+                                                         return(dat$end - dat$start + 1)
+                                                       }),
+                                   utr3_length = sapply(transcripts,
+                                                        function(x) {
+                                                          dat <- subset(gff, seqid==x & type=="UTR3")
+                                                          return(dat$end - dat$start + 1)
+                                                        }),
+                                   row.names=NULL)
+  return(transcript_lengths)
+}
+
 load_fa <- function(transcript_fa_fname) {
   # load transcript sequences from genome .fa file
   ## transcripts_fa_fname: character; file path to transcriptome .fa file

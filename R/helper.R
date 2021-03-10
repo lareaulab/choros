@@ -39,7 +39,7 @@ load_gff <- function(gff_fname) {
 load_fa <- function(transcript_fa_fname) {
   # load transcript sequences from genome .fa file
   ## transcripts_fa_fname: character; file path to transcriptome .fa file
-  transcript_sequences <- Biostrings::readDNAStringSet(transcripts_fa_fname)
+  transcript_sequences <- Biostrings::readDNAStringSet(transcript_fa_fname)
   transcript_sequences <- as.character(transcript_sequences)
   return(transcript_sequences)
 }

@@ -70,7 +70,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   alignment$rpf_f5 <- factor(alignment$rpf_f5)
   alignment$rpf_f3 <- factor(alignment$rpf_f3)
   # 8. aggregate alignments
-  alignment <- aggregate(tag.ZW ~ rname + cod_idx + d5 + d3 + rpf_f5 + rpf_f3,
+  alignment <- aggregate(tag.ZW ~ rname + utr5_length + cod_idx + d5 + d3 + rpf_f5 + rpf_f3,
                          data=alignment, FUN=sum)
   # 8. return nt_base
   if(nt_base) {

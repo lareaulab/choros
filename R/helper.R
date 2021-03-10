@@ -1,5 +1,3 @@
-## requires libraries: Biostrings
-
 load_lengths <- function(lengths_fname) {
   # load transcript lengths table
   ## length_fname: character; file path to transcript lengths file
@@ -41,23 +39,18 @@ load_gff <- function(gff_fname) {
 load_fa <- function(transcript_fa_fname) {
   # load transcript sequences from genome .fa file
   ## transcripts_fa_fname: character; file path to transcriptome .fa file
-  raw_text <- readLines(transcript_fa_fname)
-  transcript_startLines <- grep(">", raw_text)
-  num_transcripts <- length(transcript_startLines)
-  transcript_names <- sapply(transcript_startLines,
-                             function(x) {
-                               gsub(">", "", strsplit(raw_text[x], split=" ")[[1]][1])
-                             })
-  transcript_startLines <- c(transcript_startLines, length(raw_text)+1) # add extra line for bookkeeping
-  transcript_sequences <- sapply(1:num_transcripts,
-                                 function(x) {
-                                   startLine <- transcript_startLines[x]+1
-                                   endLine <- transcript_startLines[x+1]-1
-                                   transcriptSequence <- paste(raw_text[startLine:endLine], collapse="")
-                                   return(transcriptSequence)
-                                 })
-  names(transcript_sequences) <- transcript_names
+  transcript_sequences <- Biostrings::readDNAStringSet(transcripts_fa_fname)
+  transcript_sequences <- as.character(transcript_sequences)
   return(transcript_sequences)
+}
+
+write_fa <- function(transcript_seq, fa_fname) {
+  # write transcript sequence to .fa file
+  ## transcript_seq: character vector; transcript sequences
+  ### - names of transcript_seq will become header for transcript sequences
+  ## fa_fname: character; filepath to output .fa file
+  transcript_seq <- Biostrings::DNAStringSet(transcript_seq)
+  Biostrings::writeXStringSet(transcript_seq, fa_fname)
 }
 
 load_offsets <- function(offsets_fname) {
@@ -72,34 +65,28 @@ load_offsets <- function(offsets_fname) {
   return(offsets)
 }
 
-readFAfile <- function(faFile, utr5_length, utr3_length) {
-  ## read in .fa file where sequence broken up over multiple lines, convert to list of vectors of codons per transcript
-  # faFile: character; path to .fa file of transcript sequences
-  # utr5_length: numeric; length of 5' UTR
-  # utr3_length: numeric; length of 3' UTR
-  rawFile <- readLines(faFile)
-  transcriptStartLines <- grep(">", rawFile)
-  nTranscripts <- length(transcriptStartLines)
-  transcriptNames <- sapply(transcriptStartLines,
+read_fa_codons <- function(transcript_fa_fname, transcript_length_fname) {
+  # read in .fa file, convert to list of vectors of codons per transcript
+  ## transcript_fa_fname: character; file path to transcriptome .fa file
+  ## transcript_length_fname: character; file path to transcriptome lengths file
+  transcript_seq <- load_fa(transcript_fa_fname)
+  transcript_lengths <- load_lengths(transcript_length_fname)
+  codon_sequences <- sapply(seq_along(transcript_seq),
                             function(x) {
-                              gsub(">", "", strsplit(rawFile[x], split=" ")[[1]][1])
+                              tmp_seq <- transcript_seq[x]
+                              utr5_length <- subset(transcript_lengths,
+                                                    transcript == names(transcript_seq)[x])$utr5_length
+                              num_codons <- floor(nchar(tmp_seq) / 3)
+                              sequence_offset <- utr5_length %% 3
+                              codon_sequence <- substring(tmp_seq,
+                                                          first=3*(seq(num_codons)-1)+1+sequence_offset,
+                                                          last=3*seq(num_codons)+sequence_offset)
+                              names(codon_sequence) <- as.character(seq.int(from=-floor(utr5_length/3),
+                                                                            length.out=num_codons)) # start codon is 0
+                              return(codon_sequence)
                             })
-  transcriptStartLines <- c(transcriptStartLines, length(rawFile)+1, length(rawFile)+1) # add extra line for bookkeeping
-  faList <- sapply(1:nTranscripts,
-                   function(x) {
-                     startLine <- transcriptStartLines[x]+1
-                     endLine <- transcriptStartLines[x+1]-1
-                     transcriptSequence <- paste(rawFile[startLine:endLine], collapse="")
-                     nCodons <- floor((nchar(transcriptSequence))/3)
-                     sequenceOffset <- utr5_length %% 3
-                     codonSequence <- substring(transcriptSequence,
-                                                first=(3*(1:nCodons-1)+1)+sequenceOffset,
-                                                last=(3*(1:nCodons))+sequenceOffset)
-                     names(codonSequence) <- as.character(seq.int(from=-floor(utr5_length/3), length.out=nCodons)) # start codon is 0
-                     return(codonSequence)
-                   })
-  names(faList) <- transcriptNames
-  return(faList)
+  names(codon_sequences) <- names(transcript_seq)
+  return(codon_sequences)
 }
 
 get_codons <- function(transcript_name, cod_idx, utr5_length, transcript_seq) {
@@ -146,21 +133,27 @@ get_bias_seq <- function(transcript_name, cod_idx, digest_length, utr5_length,
   return(bias_seq)
 }
 
-convert_to_aa <- function(transcript_fa_fname, output_fname, utr5_length=20, utr3_length=20) {
+convert_to_aa <- function(transcript_fa_fname, transcript_length_fname, output_fname) {
   # convert transcript sequence from DNA to amino acid
   ## transcript_fa_fname: character; file.path to transcript fasta (DNA) file
+  ## transcript_length_fname: character; file path to transcriptome lengths file
   ## output_fname: character; file.path to write output fasta amino acid sequences
-  ## utr5_length: integer; length of 5' UTR
-  ## utr3_length: integer; length of 3' UTR
   # 1. load in transcript DNA sequence
-  dna_seq <- load_fa(transcript_fa_fname)
-  dna_seq <- sapply(dna_seq, function(x) { substr(x, utr5_length+1, nchar(x)-utr3_length) })
+  transcript_seq <- load_fa(transcript_fa_fname)
+  transcript_lengths <- load_lengths(transcript_length_fname)
+  dna_seq <- sapply(seq_along(transcript_seq),
+                    function(x) {
+                      tmp_seq <- transcript_seq[x]
+                      tmp_name <- names(transcript_seq)[x]
+                      tmp_utr5 <- subset(transcript_lengths, transcript==tmp_name)$utr5_length
+                      tmp_utr3 <- subset(transcript_lengths, transcript==tmp_name)$utr3_length
+                      cds_seq <- substr(tmp_seq, tmp_utr5+1, nchar(tmp_seq)-tmp_utr3)
+                      return(cds_seq)
+                    })
+  names(dna_seq) <- names(transcript_seq)
   dna_seq <- Biostrings::DNAStringSet(dna_seq)
   # 2. translate to amino acid sequence
   aa_seq <- Biostrings::translate(dna_seq)
   # 3. write amino acid sequence to fasta file
-  output_aa <- rep(NA, 2*length(aa_seq))
-  output_aa[2*(1:length(aa_seq))-1] <- paste0(">", names(aa_seq))
-  output_aa[2*(1:length(aa_seq))] <- sub("*", "", as.character( aa_seq))
-  writeLines(output_aa, con=output_fname)
+  Biostrings::writeXStringSet(aa_seq, output_fname)
 }

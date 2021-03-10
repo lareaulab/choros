@@ -1,5 +1,3 @@
-### requires libraries: prodlim
-
 correct_bias_sim <- function(dat, p5bias, n3bias, which_column="count",
                              which_f5="genome_f5", which_f3="genome_f3") {
   # predict counts if bias sequences were set to reference level, using simulation parameters

@@ -15,5 +15,5 @@ License: TBD
 Encoding: UTF-8
 LazyData: true
 Depends: parallel, doParallel, foreach, reshape, prodlim, Rsamtools, 
-    ggplot2, MASS, knitr, rmarkdown
+    ggplot2, MASS, knitr, rmarkdown, Biostrings
 VignetteBuilder: knitr, rmarkdown

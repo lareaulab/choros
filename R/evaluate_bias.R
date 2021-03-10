@@ -1,17 +1,12 @@
-### requires libraries: prodlim, ggplot2
-
-library(ggplot2)
-
-evaluate_bias <- function(dat, which_column="count", transcripts_fa_fname, transcripts_length_fname,
-                          utr5=18, utr3=15, trunc5=20, trunc3=20,
-                          num_f5_codons=6, num_f3_codons=6, type="codon", metric="corr") {
+evaluate_bias <- function(dat, which_column="count",
+                          transcripts_fa_fname, transcripts_length_fname,
+                          trunc5=20, trunc3=20, num_f5_codons=6, num_f3_codons=6,
+                          type="codon", metric="corr") {
   # perform iXnos regression and generate leave-one-out correlation plots
   ## dat: data.frame containing regression predictors and column of corrected counts
   ## which_column: character; name of column containing counts
   ## transcripts_fa_fname: character; filepath to transcriptome .fa file
   ## transcripts_length_fname: character; filepath to transcriptome lengths file
-  ## utr5: integer; 5' UTR padding in transcriptome .fa file
-  ## utr3: integer; 3' UTR padding in transcriptome .fa file
   ## trunc5: integer; number of 5' codons to leave out in codon correlation regression
   ## trunc3: integer; number of 3' codons to leave out in codon correlation regression
   ## num_f5_codons: integer; number of codons to include 5' of A site in regression
@@ -20,7 +15,7 @@ evaluate_bias <- function(dat, which_column="count", transcripts_fa_fname, trans
   ## metric: character; one of:
   ##### corr: delta correlation between full model and leave-one-out model
   ##### norm: norm of regression coefficients at that position
-  transcripts_seq <- readFAfile(transcripts_fa_fname, utr5, utr3)
+  transcripts_seq <- read_fa_codons(transcripts_fa_fname, transcripts_length_fname)
   transcripts_lengths <- load_lengths(transcripts_length_fname)
   # 1. aggregate counts by codon
   cts_by_codon <- aggregate(formula(paste(which_column, "~ transcript + cod_idx")),
@@ -91,7 +86,7 @@ evaluate_bias <- function(dat, which_column="count", transcripts_fa_fname, trans
 
 plot_bias <- function(model_metric, plot_title="", plot_subtitle="", type="codon", metric="corr") {
   # make iXnos codon correlation plots
-  ## model_cor: numeric vector; output from evaluate_bias()
+  ## model_metric: numeric vector; output from evaluate_bias()
   ## plot_title: character; title for output plot
   ## plot_subtitle: character; subtitle for output plot
   ## type: character; one of "codon" or "nt"

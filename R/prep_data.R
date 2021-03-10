@@ -1,10 +1,3 @@
-## requires libraries: parallel, doParallel, foreach, reshape, prodlim, Rsamtools, ggplot2
-
-## requires get_bias_seq() from helper.R
-
-library(foreach)
-library(ggplot2)
-
 load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, offsets_fname,
                      f5_length=2, f3_length=3, full=F, nt_base=F, num_cores=NULL) {
   # calculate proportion of footprints within each 5' and 3' digest length combination
@@ -77,7 +70,8 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   alignment$rpf_f5 <- factor(alignment$rpf_f5)
   alignment$rpf_f3 <- factor(alignment$rpf_f3)
   # 8. aggregate alignments
-  alignment <- aggregate(tag.ZW ~ rname + cod_idx + d5 + d3 + rpf_f5 + rpf_f3, data=alignment, FUN=sum)
+  alignment <- aggregate(tag.ZW ~ rname + cod_idx + d5 + d3 + rpf_f5 + rpf_f3,
+                         data=alignment, FUN=sum)
   # 8. return nt_base
   if(nt_base) {
     alignment$nt_base <- substr(as.character(alignment$rpf_f5), 1, 1)
@@ -104,14 +98,16 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   alignment <- foreach(x=split(alignment, chunks),
                        .combine='rbind', .export=c("get_bias_seq")) %dopar% {
                          within(x, {
-                           genome_f5 <- mapply(get_bias_seq, as.character(rname), cod_idx, d5,
-                                               MoreArgs=list(utr5_length=unique(transcript_length$utr5_length),
-                                                             transcript_seq=transcript_seq,
-                                                             bias_region="f5", bias_length=f5_length))
-                           genome_f3 <- mapply(get_bias_seq, as.character(rname), cod_idx, d3,
-                                               MoreArgs=list(utr5_length=unique(transcript_length$utr5_length),
-                                                             transcript_seq=transcript_seq,
-                                                             bias_region="f3", bias_length=f3_length))
+                           genome_f5 <- mapply(get_bias_seq,
+                                               as.character(rname), cod_idx, d5, utr5_length,
+                                               MoreArgs=list(transcript_seq=transcript_seq,
+                                                             bias_region="f5",
+                                                             bias_length=f5_length))
+                           genome_f3 <- mapply(get_bias_seq,
+                                               as.character(rname), cod_idx, d3, utr5_length,
+                                               MoreArgs=list(transcript_seq=transcript_seq,
+                                                             bias_region="f3",
+                                                             bias_length=f3_length))
                          })
                        }
   # return data
@@ -125,8 +121,9 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
 }
 
 init_data <- function(transcript_fa_fname, transcript_length_fname,
-                      digest5_lengths=15:18, digest3_lengths=9:11, d5_d3_subsets=NULL,
-                      f5_length=2, f3_length=3, num_cores=NULL, which_transcripts=NULL) {
+                      digest5_lengths=15:18, digest3_lengths=9:11,
+                      d5_d3_subsets=NULL, f5_length=2, f3_length=3,
+                      num_cores=NULL, which_transcripts=NULL) {
   # initialize data.frame for downstream GLM
   ## transcript_fa_fname: character; file path to transcriptome .fa file
   ## transcript_length_fname: character; file path to transcriptome lengths file
@@ -138,12 +135,12 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   ## which_transcripts: character vector; transcripts selected for regression
   transcript_seq <- load_fa(transcript_fa_fname)
   transcript_length <- load_lengths(transcript_length_fname)
-  utr5_length <- unique(transcript_length$utr5_length)
   if(!is.null(which_transcripts)) {
     transcript_seq <- transcript_seq[which_transcripts]
     transcript_length <- subset(transcript_length, transcript %in% which_transcripts)
   }
-  transcript <- unlist(mapply(rep, x=transcript_length$transcript, times=transcript_length$cds_length/3))
+  transcript <- unlist(mapply(rep, x=transcript_length$transcript,
+                              times=transcript_length$cds_length/3))
   cod_idx <- unlist(lapply(transcript_length$cds_length/3, seq))
   if(is.null(num_cores)) {
     num_cores <- parallel::detectCores()-8
@@ -154,13 +151,15 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   codons <- data.frame(transcript=transcript,
                        cod_idx=cod_idx,
                        stringsAsFactors=F)
+  codons$utr5_length <- transcript_length$utr5_length[match(codons$transcript,
+                                                            transcript_length$transcript)]
   chunks <- cut(seq.int(nrow(codons)), num_cores)
   codons <- foreach(x=split(codons, chunks),
                     .combine='rbind', .export=c("get_codons")) %dopar% {
                       data.frame(t(with(x,
-                                        mapply(get_codons, transcript, cod_idx,
-                                               MoreArgs=list(utr5_length=utr5_length,
-                                                             transcript_seq=transcript_seq)))),
+                                        mapply(get_codons,
+                                               transcript, cod_idx, utr5_length,
+                                               MoreArgs=list(transcript_seq=transcript_seq)))),
                                  row.names=NULL)
                     }
   if(!is.null(d5_d3_subsets)) {
@@ -174,12 +173,16 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   dat <- foreach(x=split(dat, chunks),
                  .combine='rbind', .export=c("get_bias_seq")) %dopar% {
                    within(x, {
-                     genome_f5 <- mapply(get_bias_seq, as.character(transcript), cod_idx, d5,
-                                  MoreArgs=list(utr5_length=utr5_length, transcript_seq=transcript_seq,
-                                                bias_region="f5", bias_length=f5_length))
-                     genome_f3 <- mapply(get_bias_seq, as.character(transcript), cod_idx, d3,
-                                  MoreArgs=list(utr5_length=utr5_length, transcript_seq=transcript_seq,
-                                                bias_region="f3", bias_length=f3_length))
+                     genome_f5 <- mapply(get_bias_seq,
+                                         as.character(transcript), cod_idx, d5, utr5_length,
+                                         MoreArgs=list(transcript_seq=transcript_seq,
+                                                       bias_region="f5",
+                                                       bias_length=f5_length))
+                     genome_f3 <- mapply(get_bias_seq,
+                                         as.character(transcript), cod_idx, d3, utr5_length,
+                                         MoreArgs=list(transcript_seq=transcript_seq,
+                                                       bias_region="f3",
+                                                       bias_length=f3_length))
                    })
                  }
   dat$d5 <- factor(dat$d5, levels=unique(d5_d3_subsets$d5))

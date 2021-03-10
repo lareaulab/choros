@@ -1,7 +1,16 @@
 # export functions
-export('load_bam', 'count_d5_d3', 'init_data', 'count_footprints',
-       'correct_bias', 'evaluate_bias', 'plot_bias',
-       'load_lengths', 'load_gff')
+## helper.R:
+export('load_lengths', 'load_gff', 'load_fa', 'load_offsets',
+       'read_fa_codons', 'get_codons', 'get_bias_seq', 'convert_to_aa')
+## prep_data.R:
+export('load_bam', "init_data", 'count_d5_d3', 'count_footprints')
+## correct_bias.R:
+export('correct_bias')
+## evaluate_bias.R:
+export('evaluate_bias', 'plot_bias')
+## choros.R:
+## TODO: add wrapper function for interaction
+export('choros')
 # import packages
 importFrom('parallel', 'makeCluster', 'stopCluster')
 importFrom('doParallel', "registerDoParallel")
@@ -11,3 +20,5 @@ importFrom('prodlim', 'row.match')
 importFrom('Rsamtools', 'BamFile', 'ScanBamParam', 'scanBam')
 import('ggplot2')
 importFrom('MASS', 'glm.nb')
+importFrom('Biostrings', 'DNAStringSet', 'readDNAStringSet',
+           'writeXStringSet', 'translate')

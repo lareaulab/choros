@@ -142,6 +142,8 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   transcript <- unlist(mapply(rep, x=transcript_length$transcript,
                               times=transcript_length$cds_length/3))
   cod_idx <- unlist(lapply(transcript_length$cds_length/3, seq))
+  utr5_length <- transcript_length$utr5_length[match(transcript,
+                                                     transcript_length$transcript)]
   if(is.null(num_cores)) {
     num_cores <- parallel::detectCores()-8
   }
@@ -150,9 +152,8 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   doParallel::registerDoParallel(cl)
   codons <- data.frame(transcript=transcript,
                        cod_idx=cod_idx,
+                       utr5_length=utr5_length,
                        stringsAsFactors=F)
-  codons$utr5_length <- transcript_length$utr5_length[match(codons$transcript,
-                                                            transcript_length$transcript)]
   chunks <- cut(seq.int(nrow(codons)), num_cores)
   codons <- foreach(x=split(codons, chunks),
                     .combine='rbind', .export=c("get_codons")) %dopar% {
@@ -163,10 +164,10 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
                                  row.names=NULL)
                     }
   if(!is.null(d5_d3_subsets)) {
-    dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons),
+    dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length),
                                    d5_d3_subsets)
   } else {
-    dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons),
+    dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length),
                                    expand.grid(d5=digest5_lengths, d3=digest3_lengths))
   }
   chunks <- cut(seq.int(nrow(dat)), num_cores)

@@ -157,3 +157,59 @@ convert_to_aa <- function(transcript_fa_fname, transcript_length_fname, output_f
   # 3. write amino acid sequence to fasta file
   Biostrings::writeXStringSet(aa_seq, output_fname)
 }
+
+plot_start_stop <- function(bam_fname, transcript_length_fname, plot_title="",
+                            start_min=-20, start_max=5,
+                            stop_min=-5, stop_max=20,
+                            length_min=15, length_max=35) {
+  # return plot of footprint density around start and stop codons
+  ## bam_fname: character; file.path to bam alignment file
+  ## - must contain tag.ZW from RSEM
+  ## transcript_length_fname: character; file.path to transcript lengths file
+  ## plot_title: character; plot title
+  ## start_min: integer; 5'-most position to plot, relative to start codon
+  ## start_max: integer; 3'-most position to plot, relative to start codon
+  ## stop_min: integer; 5'-most position to plot, relative to stop codon
+  ## stop_max: integer; 3'-most position to plot, relative to stop codon
+  ## length_min: integer; minimum fragment length
+  ## length_max: integer; maximum fragment length
+  # load transcript lengths file
+  transcript_lengths <- load_lengths(transcript_length_fname)
+  # load alignment
+  features <- c("rname", "pos", "seq", "qwidth")
+  bam_param <- Rsamtools::ScanBamParam(tag=c("ZW", "MD"), what=features)
+  bam_file <- Rsamtools::BamFile(bam_fname)
+  bam_dat <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
+  # subset to alignments to transcripts
+  bam_dat <- subset(bam_dat, !is.na(rname))
+  # wrangle data
+  bam_dat$pos_end3 <- with(bam_dat, pos + qwidth - 1)
+  bam_dat$utr5_length <- transcript_lengths$utr5_length[match(bam_dat$rname,
+                                                              transcript_lengths$transcript)]
+  bam_dat$cds_length <- transcript_lengths$cds_length[match(bam_dat$rname,
+                                                            transcript_lengths$transcript)]
+  bam_dat$dist_start <- with(bam_dat, pos - utr5_length)
+  bam_dat$dist_stop <- with(bam_dat, pos_end3 - utr5_length - cds_length)
+  # start codon plot
+  bam_start <- subset(bam_dat, (dist_start %in% seq(start_min, start_max)) &
+                        (qwidth %in% seq(length_min, length_max)))
+  bam_start <- aggregate(tag.ZW ~ dist_start + qwidth, data=bam_start, FUN=sum)
+  plot_start <- ggplot(bam_start, aes(x=dist_start, y=qwidth, fill=tag.ZW)) +
+    geom_tile(color=1) + theme_classic() + coord_fixed(ratio=1) +
+    scale_fill_gradient(low="white", high="blue", name="count") +
+    ggtitle(plot_title, subtitle="start codon") +
+    xlab("distance to start codon") + ylab("fragment length")
+  # stop codon plot
+  bam_stop <- subset(bam_dat, (dist_stop %in% seq(stop_min, stop_max)) &
+                       (qwidth %in% seq(length_min, length_max)))
+  bam_stop <- aggregate(tag.ZW ~ dist_stop + qwidth, data=bam_stop, FUN=sum)
+  plot_stop <- ggplot(bam_stop, aes(x=dist_stop, y=qwidth, fill=tag.ZW)) +
+    geom_tile(color=1) + theme_classic() + coord_fixed(ratio=1) +
+    scale_fill_gradient(low="white", high="blue", name="count") +
+    ggtitle(plot_title, subtitle="stop codon") +
+    xlab("distance to stop codon") + ylab("fragment length")
+  # return plots
+  return(list(start = plot_start,
+              stop = plot_stop,
+              both = plot_start / (plot_stop + ggtitle(""))))
+}

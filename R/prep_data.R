@@ -123,7 +123,8 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
 init_data <- function(transcript_fa_fname, transcript_length_fname,
                       digest5_lengths=15:18, digest3_lengths=9:11,
                       d5_d3_subsets=NULL, f5_length=2, f3_length=3,
-                      num_cores=NULL, which_transcripts=NULL) {
+                      num_cores=NULL, which_transcripts=NULL,
+                      exclude_codons5=10, exclude_codons3=10) {
   # initialize data.frame for downstream GLM
   ## transcript_fa_fname: character; file path to transcriptome .fa file
   ## transcript_length_fname: character; file path to transcriptome lengths file
@@ -133,6 +134,8 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   ## bias_length: integer; length of bias sequence
   ## num_cores: integer; number of cores to parallelize over
   ## which_transcripts: character vector; transcripts selected for regression
+  ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
+  ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
   transcript_seq <- load_fa(transcript_fa_fname)
   transcript_length <- load_lengths(transcript_length_fname)
   if(!is.null(which_transcripts)) {
@@ -140,8 +143,12 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
     transcript_length <- subset(transcript_length, transcript %in% which_transcripts)
   }
   transcript <- unlist(mapply(rep, x=transcript_length$transcript,
-                              times=transcript_length$cds_length/3))
-  cod_idx <- unlist(lapply(transcript_length$cds_length/3, seq))
+                              times=(transcript_length$cds_length/3 -
+                                       exclude_codons5 - exclude_codons3)))
+  cod_idx <- unlist(lapply(transcript_length$cds_length/3,
+                           function(x) {
+                             seq(exclude_codons5 + 1, x - exclude_codons3)
+                           }))
   utr5_length <- transcript_length$utr5_length[match(transcript,
                                                      transcript_length$transcript)]
   if(is.null(num_cores)) {

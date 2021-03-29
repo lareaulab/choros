@@ -158,7 +158,7 @@ convert_to_aa <- function(transcript_fa_fname, transcript_length_fname, output_f
   Biostrings::writeXStringSet(aa_seq, output_fname)
 }
 
-plot_start_stop <- function(bam_fname, transcript_length_fname, plot_title="",
+plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
                             start_min=-20, start_max=5,
                             stop_min=-5, stop_max=20,
                             length_min=15, length_max=35) {
@@ -183,33 +183,50 @@ plot_start_stop <- function(bam_fname, transcript_length_fname, plot_title="",
   # subset to alignments to transcripts
   bam_dat <- subset(bam_dat, !is.na(rname))
   # wrangle data
-  bam_dat$pos_end3 <- with(bam_dat, pos + qwidth - 1)
   bam_dat$utr5_length <- transcript_lengths$utr5_length[match(bam_dat$rname,
                                                               transcript_lengths$transcript)]
   bam_dat$cds_length <- transcript_lengths$cds_length[match(bam_dat$rname,
                                                             transcript_lengths$transcript)]
-  bam_dat$dist_start <- with(bam_dat, pos - utr5_length)
-  bam_dat$dist_stop <- with(bam_dat, pos_end3 - utr5_length - cds_length)
+  bam_dat$d5 <- with(bam_dat, pos - utr5_length)
+  bam_dat$d3 <- with(bam_dat, (pos + qwidth - 1) - (utr5_length + cds_length))
+  bam_dat$dist_stop <- with(bam_dat, pos - (utr5_length + cds_length))
+  num_reads <- round(sum(bam_dat$tag.ZW))
   # start codon plot
-  bam_start <- subset(bam_dat, (dist_start %in% seq(start_min, start_max)) &
-                        (qwidth %in% seq(length_min, length_max)))
-  bam_start <- aggregate(tag.ZW ~ dist_start + qwidth, data=bam_start, FUN=sum)
-  plot_start <- ggplot(bam_start, aes(x=dist_start, y=qwidth, fill=tag.ZW)) +
-    geom_tile(color=1) + theme_classic() + coord_fixed(ratio=1) +
+  d5_dat <- subset(bam_dat, (d5 %in% seq(start_min, start_max)) &
+                     (qwidth %in% seq(length_min, length_max)))
+  d5_dat <- aggregate(tag.ZW ~ d5 + qwidth, data=d5_dat, FUN=sum)
+  plot_d5 <- ggplot(d5_dat, aes(x=d5, y=qwidth, fill=tag.ZW)) +
+    geom_tile(color=1) + theme_classic() +
     scale_fill_gradient(low="white", high="blue", name="count") +
-    ggtitle(plot_title, subtitle="start codon") +
-    xlab("distance to start codon") + ylab("fragment length")
+    xlab("distance between read 5' end and start codon") + ylab("fragment length")
+  start_dat <- subset(bam_dat, d5 > start_min & d5 < 50)
+  start_dat <- aggregate(tag.ZW ~ d5, data=start_dat, FUN=sum)
+  start_dat$tag.ZW <- start_dat$tag.ZW / sum(bam_dat$tag.ZW)
+  plot_start <- ggplot(start_dat, aes(x=d5, y=tag.ZW)) +
+    geom_col() + theme_classic() +
+    xlab("distance between read 5' end and start codon") + ylab("density")
   # stop codon plot
-  bam_stop <- subset(bam_dat, (dist_stop %in% seq(stop_min, stop_max)) &
-                       (qwidth %in% seq(length_min, length_max)))
-  bam_stop <- aggregate(tag.ZW ~ dist_stop + qwidth, data=bam_stop, FUN=sum)
-  plot_stop <- ggplot(bam_stop, aes(x=dist_stop, y=qwidth, fill=tag.ZW)) +
-    geom_tile(color=1) + theme_classic() + coord_fixed(ratio=1) +
+  d3_dat <- subset(bam_dat, (d3 %in% seq(stop_min, stop_max)) &
+                     (qwidth %in% seq(length_min, length_max)))
+  d3_dat <- aggregate(tag.ZW ~ d3 + qwidth, data=d3_dat, FUN=sum)
+  plot_d3 <- ggplot(d3_dat, aes(x=d3, y=qwidth, fill=tag.ZW)) +
+    geom_tile(color=1) + theme_classic() +
     scale_fill_gradient(low="white", high="blue", name="count") +
-    ggtitle(plot_title, subtitle="stop codon") +
-    xlab("distance to stop codon") + ylab("fragment length")
+    xlab("distance between read 3' end and stop codon") + ylab("fragment length")
+  stop_dat <- subset(bam_dat, dist_stop > -60 & dist_stop < 10)
+  stop_dat <- aggregate(tag.ZW ~ dist_stop, data=stop_dat, FUN=sum)
+  stop_dat$tag.ZW <- stop_dat$tag.ZW / sum(bam_dat$tag.ZW)
+  plot_stop <- ggplot(stop_dat, aes(x=dist_stop, y=tag.ZW)) +
+    geom_col() + theme_classic() +
+    xlab("distance between read 5' end and stop codon") + ylab("density")
+  # histogram of fragment lengths
+  length_dat <- aggregate(tag.ZW ~ qwidth, data=bam_dat, FUN=sum)
+  length_dat <- subset(length_dat, qwidth >= 15 & qwidth <= 50)
+  plot_length <- ggplot(length_dat, aes(x=qwidth, y=tag.ZW)) +
+    geom_col() + theme_classic() + xlim(15, 50) +
+    xlab("fragment length (nt)") + ylab("") +
+    ggtitle(plot_title, subtitle=paste("n =", num_reads, "footprints"))
   # return plots
-  return(list(start = plot_start,
-              stop = plot_stop,
-              both = plot_start / (plot_stop + ggtitle(""))))
+  aggregate_plot <- plot_length / (plot_start + plot_stop) / (plot_d5 + plot_d3)
+  return(aggregate_plot)
 }

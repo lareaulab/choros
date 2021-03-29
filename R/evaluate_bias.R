@@ -35,6 +35,11 @@ evaluate_bias <- function(dat, which_column="count",
                                  return(tmp_subset)
                                })
   cts_by_codon <- do.call(rbind, cts_by_codon_trunc)
+  ##### remove transcripts with NA counts (mean = 0?)
+  ## TODO: error message
+  bad_transcript <- which(sapply(cts_by_codon_trunc, function(x) any(is.na(x[, which_column]))))
+  cts_by_codon_trunc <- sapply(bad_transcript, function(x) cts_by_codon_trunc[[x]]$transcript)
+  cts_by_codon <- subset(cts_by_codon, !(transcript %in% as.character(cts_by_codon_trunc)))
   # 3. make data.frame for iXnos regression
   codons <- data.frame(t(sapply(1:nrow(cts_by_codon),
                                 function(x) {

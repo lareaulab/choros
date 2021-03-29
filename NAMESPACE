@@ -2,7 +2,7 @@
 ## helper.R:
 export('load_lengths', 'load_gff', 'load_fa', 'load_offsets',
        'read_fa_codons', 'get_codons', 'get_bias_seq', 'convert_to_aa',
-       'plot_start_stop')
+       'plot_diagnostic')
 ## prep_data.R:
 export('load_bam', "init_data", 'count_d5_d3', 'count_footprints')
 ## correct_bias.R:

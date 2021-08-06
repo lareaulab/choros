@@ -41,6 +41,10 @@ load_fa <- function(transcript_fa_fname) {
   ## transcripts_fa_fname: character; file path to transcriptome .fa file
   transcript_sequences <- Biostrings::readDNAStringSet(transcript_fa_fname)
   transcript_sequences <- as.character(transcript_sequences)
+  names(transcript_sequences) <- sapply(names(transcript_sequences),
+                                        function(x) {
+                                          strsplit(x, split=" ")[[1]][1]
+                                        })
   return(transcript_sequences)
 }
 

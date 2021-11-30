@@ -257,12 +257,14 @@ plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
 }
 
 calculate_codon_density <- function(bam_dat, transcript_length,
-                                    exclude_codons5=10, exclude_codons3=10) {
-  # return vector of counts per codon
+                                    exclude_codons5=10, exclude_codons3=10,
+                                    normalize=F) {
+  # return vector of counts per codon (for individual transcript)
   ## bam_dat: data.frame; output (or subset of) from load_bam()
   ## transcript_length: integer; number of codons in transcript
   ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
   ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
+  ## normalize: logical; whether to normalize codon counts by average across transcript
   # 1. initialize empty vector
   counts <- rep(0, transcript_length)
   names(counts) <- seq(transcript_length)
@@ -272,6 +274,10 @@ calculate_codon_density <- function(bam_dat, transcript_length,
   counts[bam_dat_cts$cod_idx] <- bam_dat_cts$count
   # 4. remove first and last codons
   counts <- counts[(1+exclude_codons5):(length(counts)-exclude_codons3)]
+  # 5. normalize by average across transcript
+  if(normalize) {
+    counts / mean(counts)
+  }
   return(counts)
 }
 

@@ -24,12 +24,13 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   }
   bam_param <- Rsamtools::ScanBamParam(tag=c("ZW", "MD"), what=features)
   alignment <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
-  num_footprints <- nrow(alignment)
-  print(paste("Read in", num_footprints, "total footprints"))
+  num_footprints <- sum(alignment$tag.ZW)
+  print(paste("Read in", round(num_footprints, 1), "total RPF counts"))
+  tmp_counts <- sum(subset(alignment, is.na(rname))$tag.ZW)
   print(paste("... Removing",
-              sum(is.na(alignment$rname)),
-              paste0("(", round(sum(is.na(alignment$rname)) / num_footprints * 100, 1), "%)"),
-              "unaligned footprints"))
+              round(tmp_counts, 1),
+              paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
+              "unaligned RPF counts"))
   alignment <- subset(alignment, !is.na(alignment$rname))
   # 2. assign 5' UTR lengths
   transcript_length <- load_lengths(transcript_length_fname)
@@ -39,11 +40,18 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   alignment$frame <- (alignment$pos - alignment$utr5_length - 1) %% 3
   # 4. calculate 5' and 3' digest lengths
   offsets <- load_offsets(offsets_fname)
+  tmp_counts <- sum(subset(alignment, !(qwidth %in% unique(offsets$length)))$tag.ZW)
+  print(paste("... Removing",
+              round(tmp_counts, 1),
+              paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
+              "RPF counts outside length distribution"))
+  alignment <- subset(alignment, qwidth %in% unique(offsets$length))
   alignment$d5 <- offsets$offset[prodlim::row.match(alignment[,c("frame", "qwidth")],
                                                     offsets[c("frame", "length")])]
+  tmp_counts <- sum(subset(alignment, is.na(d5))$tag.ZW)
   print(paste("... Removing",
-              sum(is.na(alignment$d5)),
-              paste0("(", round(sum(is.na(alignment$d5)) / num_footprints * 100, 1), "%)"),
+              round(tmp_counts, 1),
+              paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
               "footprints outside A site offset definitions"))
   alignment <- subset(alignment, !is.na(alignment$d5))
   # 5. calculate 3' digest lengths
@@ -53,18 +61,20 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   alignment$cds_length <- transcript_length$cds_length[match(alignment$rname,
                                                              transcript_length$transcript)]/3
   outside_cds <- ((alignment$cod_idx <= 0) | (alignment$cod_idx > alignment$cds_length))
+  tmp_counts <- sum(subset(alignment, outside_cds)$tag.ZW)
   print(paste("... Removing",
-              sum(outside_cds),
-              paste0("(", round(sum(outside_cds) / num_footprints * 100, 1), "%)"),
+              round(tmp_counts, 1),
+              paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
               "footprints outside CDS"))
   alignment <- subset(alignment, !outside_cds)
   # 7. pull bias sequences
   alignment$rpf_f5 <- substr(alignment$seq, 1, f5_length)
   alignment$rpf_f3 <- mapply(substr, alignment$seq, alignment$qwidth-f3_length+1, alignment$qwidth)
   invalid_bias_seq <- (grepl("N", alignment$rpf_f5) | grepl("N", alignment$rpf_f3))
+  tmp_counts <- sum(subset(alignment, invalid_bias_seq)$tag.ZW)
   print(paste("... Removing",
-              sum(invalid_bias_seq),
-              paste0("(", round(sum(invalid_bias_seq) / num_footprints * 100, 1), "%)"),
+              round(tmp_counts, 1),
+              paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
               "footprints with N in bias region"))
   alignment <- subset(alignment, !invalid_bias_seq)
   alignment$rpf_f5 <- factor(alignment$rpf_f5)
@@ -78,9 +88,9 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
     alignment$nt_base[!grepl("^0(A|T|C|G)", as.character(alignment$tag.MD))] <- "-"
     nt_bases <- c("-", "A", "T", "C", "G")
     alignment$nt_base <- factor(alignment$nt_base, levels=nt_bases)
-    num_mismatch <- sum(alignment$nt_base != "-")
+    num_mismatch <- sum(subset(alignment, nt_base !="-")$tag.ZW)
     print(paste("...",
-                num_mismatch,
+                round(num_mismatch, 1),
                 paste0("(", round(num_mismatch / nrow(alignment) * 100, 1), "%)"),
                 "footprints with non-templated 5' base"))
     for(nt in nt_bases[-1]) {

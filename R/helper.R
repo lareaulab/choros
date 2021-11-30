@@ -191,47 +191,68 @@ plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
                                                               transcript_lengths$transcript)]
   bam_dat$cds_length <- transcript_lengths$cds_length[match(bam_dat$rname,
                                                             transcript_lengths$transcript)]
-  bam_dat$d5 <- with(bam_dat, pos - utr5_length)
-  bam_dat$d3 <- with(bam_dat, (pos + qwidth - 1) - (utr5_length + cds_length))
-  bam_dat$dist_stop <- with(bam_dat, pos - (utr5_length + cds_length))
+  bam_dat$frame <- factor(with(bam_dat, (pos - utr5_length - 1) %% 3),
+                             levels=0:2)
+  bam_dat$start_distance <- with(bam_dat, pos-(utr5_length+1+3))
+  bam_dat$stop_distance <- with(bam_dat, (pos+qwidth+1)-(utr5_length+cds_length))
   num_reads <- round(sum(bam_dat$tag.ZW))
   # start codon plot
-  d5_dat <- subset(bam_dat, (d5 %in% seq(start_min, start_max)) &
-                     (qwidth %in% seq(length_min, length_max)))
-  d5_dat <- aggregate(tag.ZW ~ d5 + qwidth, data=d5_dat, FUN=sum)
-  plot_d5 <- ggplot(d5_dat, aes(x=d5, y=qwidth, fill=tag.ZW)) +
+  start_ribogrid <- subset(bam_dat, (start_distance %in% seq(start_min, start_max)) &
+                             (qwidth %in% seq(length_min, length_max)))
+  start_ribogrid <- aggregate(tag.ZW ~ start_distance + qwidth,
+                              data=start_ribogrid, FUN=sum)
+  plot_start_ribogrid <- ggplot(start_ribogrid,
+                                aes(x=start_distance, y=qwidth, fill=tag.ZW)) +
     geom_tile(color=1) + theme_classic() +
     scale_fill_gradient(low="white", high="blue", name="count") +
-    xlab("distance between read 5' end and start codon") + ylab("fragment length")
-  start_dat <- subset(bam_dat, d5 > start_min & d5 < 50)
-  start_dat <- aggregate(tag.ZW ~ d5, data=start_dat, FUN=sum)
-  start_dat$tag.ZW <- start_dat$tag.ZW / sum(bam_dat$tag.ZW)
-  plot_start <- ggplot(start_dat, aes(x=d5, y=tag.ZW)) +
+    xlab("read 5' end to start codon (P site)") + ylab("RPF length") +
+    scale_x_continuous(breaks=seq(from=start_min, to=start_max, by=5)) +
+    scale_y_continuous(breaks=seq(from=length_min, to=length_max, by=5))
+  start_hist_dat <- aggregate(tag.ZW ~ start_distance, data=start_ribogrid, FUN=sum)
+  start_hist_dat$tag.ZW <- with(start_hist_dat, tag.ZW / sum(tag.ZW))
+  plot_start <- ggplot(start_hist_dat, aes(x=start_distance, y=tag.ZW)) +
     geom_col() + theme_classic() +
     xlab("distance between read 5' end and start codon") + ylab("density")
   # stop codon plot
-  d3_dat <- subset(bam_dat, (d3 %in% seq(stop_min, stop_max)) &
-                     (qwidth %in% seq(length_min, length_max)))
-  d3_dat <- aggregate(tag.ZW ~ d3 + qwidth, data=d3_dat, FUN=sum)
-  plot_d3 <- ggplot(d3_dat, aes(x=d3, y=qwidth, fill=tag.ZW)) +
+  stop_ribogrid <- subset(bam_dat, (stop_distance %in% seq(stop_min, stop_max)) &
+                            (qwidth %in% seq(length_min, length_max)))
+  stop_ribogrid <- aggregate(tag.ZW ~ stop_distance + qwidth,
+                             data=stop_ribogrid, FUN=sum)
+  plot_stop_ribogrid <- ggplot(stop_ribogrid,
+                               aes(x=stop_distance, y=qwidth, fill=tag.ZW)) +
     geom_tile(color=1) + theme_classic() +
     scale_fill_gradient(low="white", high="blue", name="count") +
-    xlab("distance between read 3' end and stop codon") + ylab("fragment length")
-  stop_dat <- subset(bam_dat, dist_stop > -60 & dist_stop < 10)
-  stop_dat <- aggregate(tag.ZW ~ dist_stop, data=stop_dat, FUN=sum)
-  stop_dat$tag.ZW <- stop_dat$tag.ZW / sum(bam_dat$tag.ZW)
-  plot_stop <- ggplot(stop_dat, aes(x=dist_stop, y=tag.ZW)) +
+    xlab("read 3' end to stop codon") + ylab("RPF length") +
+    scale_x_continuous(breaks=seq(from=stop_min, to=stop_max, by=5)) +
+    scale_y_continuous(breaks=seq(from=length_min, to=length_max, by=5))
+  stop_hist_dat <- aggregate(tag.ZW ~ stop_distance, data=stop_ribogrid, FUN=sum)
+  stop_hist_dat$tag.ZW <- with(stop_hist_dat, tag.ZW / sum(tag.ZW))
+  plot_stop <- ggplot(stop_hist_dat, aes(x=stop_distance, y=tag.ZW)) +
     geom_col() + theme_classic() +
     xlab("distance between read 5' end and stop codon") + ylab("density")
   # histogram of fragment lengths
-  length_dat <- aggregate(tag.ZW ~ qwidth, data=bam_dat, FUN=sum)
-  length_dat <- subset(length_dat, qwidth >= 15 & qwidth <= 50)
-  plot_length <- ggplot(length_dat, aes(x=qwidth, y=tag.ZW)) +
-    geom_col() + theme_classic() + xlim(15, 50) +
-    xlab("fragment length (nt)") + ylab("") +
-    ggtitle(plot_title, subtitle=paste("n =", num_reads, "footprints"))
+  length_dat <- aggregate(tag.ZW ~ qwidth + frame, data=bam_dat, FUN=sum)
+  length_dat <- subset(length_dat, qwidth >= length_min & qwidth <= length_max)
+  plot_length <- ggplot(length_dat, aes(x=qwidth, y=tag.ZW, fill=frame)) +
+    geom_col() + theme_classic() + xlab("fragment length (nt)") + ylab("") +
+    ggtitle(plot_title, subtitle=paste("n =", num_reads, "footprints")) +
+    scale_fill_manual(values=RColorBrewer::brewer.pal(3, "Set1")) +
+    theme(legend.position="right")
+  # frame v. length plot
+  frame_length_dat <- aggregate(tag.ZW ~ qwidth + frame, data=bam_dat, FUN=sum)
+  plot_frame_length <- ggplot(frame_length_dat, aes(x=frame, y=qwidth, fill=tag.ZW)) +
+    geom_tile(color=1) + theme_classic() + coord_fixed(ratio=1) +
+    scale_fill_gradient(low="white", high="blue", name="count") +
+    xlab("frame") + ylab("RPF length")
   # return plots
-  aggregate_plot <- plot_length / (plot_start + plot_stop) / (plot_d5 + plot_d3)
+  aggregate_plot <- plot_length +
+    plot_start + plot_stop +
+    plot_start_ribogrid + plot_stop_ribogrid +
+    plot_frame_length +
+    plot_layout(design="
+                11116
+                22336
+                44556")
   return(aggregate_plot)
 }
 
@@ -239,7 +260,7 @@ calculate_codon_density <- function(bam_dat, transcript_length,
                                     exclude_codons5=10, exclude_codons3=10) {
   # return vector of counts per codon
   ## bam_dat: data.frame; output (or subset of) from load_bam()
-  ## transcript_lenght: integer; number of codons in transcript
+  ## transcript_length: integer; number of codons in transcript
   ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
   ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
   # 1. initialize empty vector
@@ -267,7 +288,7 @@ calculate_transcript_density <- function(bam_dat, transcript_length_fname, stati
   bam_dat$transcript <- droplevels(bam_dat$transcript)
   per_transcript <- split(bam_dat, bam_dat$transcript)
   num_codons <- transcript_lengths$cds_length[match(names(per_transcript),
-                                                          transcript_lengths$transcript)] / 3
+                                                    transcript_lengths$transcript)] / 3
   # 2. aggregate footprints by cod_idx
   per_transcript <- lapply(seq_along(per_transcript),
                            function(x) {

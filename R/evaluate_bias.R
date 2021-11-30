@@ -89,7 +89,8 @@ evaluate_bias <- function(dat, which_column="count",
   }
 }
 
-plot_bias <- function(model_metric, plot_title="", plot_subtitle="", type="codon", metric="corr") {
+plot_bias <- function(model_metric, plot_title="", plot_subtitle="",
+                      type="codon", metric="corr", fill_colors=NULL) {
   # make iXnos codon correlation plots
   ## model_metric: numeric vector; output from evaluate_bias()
   ## plot_title: character; title for output plot
@@ -98,12 +99,36 @@ plot_bias <- function(model_metric, plot_title="", plot_subtitle="", type="codon
   ## metric: character; one of:
   ##### corr: delta correlation between full model and leave-one-out model
   ##### norm: norm of regression coefficients at that position
+  ## fill_colors: named character vector; colors corresponding positions
+  if(is.null(fill_colors)) {
+    fill_colors <- c(RColorBrewer::brewer.pal(4, "Set1"), "grey")
+    names(fill_colors) <- c("bias", "E", "P", "A", "other")
+  } else {
+    # TODO: add checks for whether fill_colors is valid
+    if(length(fill_colors) == 1 & fill_colors=="none") {
+      fill_colors <- rep("grey", 5)
+      names(fill_colors) <- c("bias", "E", "P", "A", "other")
+    }
+  }
   names(model_metric) <- sub("n", "-", names(model_metric))
   names(model_metric) <- sub("p", "", names(model_metric))
-  model_metric <- data.frame(position=factor(names(model_metric), levels=names(model_metric)),
-                             value=model_metric)
-  bias_plot <- ggplot(model_metric, aes(x=position, y=value)) + geom_col() +
-    theme_bw() + xlab("position") + ggtitle(plot_title, subtitle=plot_subtitle)
+  model_metric <- data.frame(position=factor(names(model_metric),
+                                             levels=names(model_metric)),
+                             value=model_metric,
+                             col="other", stringsAsFactors=F)
+  model_metric$col[grepl("^A", as.character(model_metric$position))] <- "A"
+  model_metric$col[grepl("^P", as.character(model_metric$position))] <- "P"
+  model_metric$col[grepl("^E", as.character(model_metric$position))] <- "E"
+  if(type=="codon") {
+    model_metric$col[model_metric$position %in% c(-4, -5, 3, 4)] <- "bias"
+  } else {
+    suppressWarnings(tmp_position <- as.numeric(as.character(model_metric$position)))
+    model_metric$col[tmp_position <= -14 | tmp_position >= 9] <- "bias"
+  }
+  bias_plot <- ggplot(model_metric, aes(x=position, y=value, fill=col)) +
+    geom_col() +theme_bw() + xlab("position") +
+    ggtitle(plot_title, subtitle=plot_subtitle) + theme(legend.position="none") +
+    scale_fill_manual(values=fill_colors)
   if(type=="nt") {
     bias_plot <- bias_plot + theme(axis.text.x=element_text(angle=90, vjust=0.5))
   }
@@ -112,6 +137,5 @@ plot_bias <- function(model_metric, plot_title="", plot_subtitle="", type="codon
   } else {
     bias_plot <- bias_plot + ylab(expression(paste(Sigma, "(", beta^2, ")")))
   }
-  ### TODO: add color to bars according to position
   return(bias_plot)
 }

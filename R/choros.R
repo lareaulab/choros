@@ -22,7 +22,7 @@ choros <- function(bam_fname, transcript_fa_fname,
                        offsets_fname, f5_length, f3_length)
   # 2. compute size/frame subsets
   print("Computing d5/d3 subsets")
-  d5_d3 <- count_d3_d5(bam_data)
+  d5_d3 <- count_d5_d3(bam_data)
   d5_d3_subsets <- d5_d3$counts[1:(which(d5_d3$counts$proportion>min_prop)[1]),
                                 c("d5", "d3")]
   subset_names <- sapply(seq(nrow(d5_d3_subsets)),

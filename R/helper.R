@@ -192,7 +192,7 @@ plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
   bam_dat$cds_length <- transcript_lengths$cds_length[match(bam_dat$rname,
                                                             transcript_lengths$transcript)]
   bam_dat$frame <- factor(with(bam_dat, (pos - utr5_length - 1) %% 3),
-                             levels=0:2)
+                          levels=0:2)
   bam_dat$start_distance <- with(bam_dat, pos-(utr5_length+1+3))
   bam_dat$stop_distance <- with(bam_dat, (pos+qwidth+1)-(utr5_length+cds_length))
   num_reads <- round(sum(bam_dat$tag.ZW))
@@ -308,4 +308,33 @@ calculate_transcript_density <- function(bam_dat, transcript_length_fname,
   per_transcript <- sapply(per_transcript, FUN=statistic)
   per_transcript <- sort(per_transcript, decreasing=T)
   return(per_transcript)
+}
+
+parse_coefs <- function(nb_fit) {
+  # prase data.frame of regression coefficients for downstream analyses
+  ## nb_fit: negbin object from running glm.nb()
+  ref_levels <- sapply(seq_along(names(nb_fit$xlevels)),
+                       function(x) {
+                         paste0(names(nb_fit$xlevels)[x], nb_fit$xlevels[[x]][1])
+                       })
+  fit_coefs <- data.frame(name=c(names(coef(nb_fit)), ref_levels),
+                          value=c(coef(nb_fit), rep(1, length(ref_levels))),
+                          type=NA, coef=NA, alt_coef=NA,
+                          row.names=NULL, stringsAsFactors=F)
+  for(tmp_coef in c("transcript", "A", "P", "E", "genome_f5", "genome_f3")) {
+    tmp_index <- grepl(paste0("^", tmp_coef), fit_coefs$name)
+    fit_coefs$type[tmp_index] <- tmp_coef
+    fit_coefs$coef[tmp_index] <- sub(paste0("^", tmp_coef), "", fit_coefs$name[tmp_index])
+  }
+  for(tmp_coef in c(3, 5)) {
+    tmp_index <- grepl(paste0("^d", tmp_coef), fit_coefs$name) & !(grepl(":", fit_coefs$name))
+    fit_coefs$type[tmp_index] <- paste0("d", tmp_coef)
+    fit_coefs$coef[tmp_index] <- sub(paste0("^d", tmp_coef), "", fit_coefs$name[tmp_index])
+    tmp_index <- grepl(paste0("^d", tmp_coef), fit_coefs$name) & (grepl(":", fit_coefs$name))
+    fit_coefs$type[tmp_index] <- paste0("d", tmp_coef, ":f", tmp_coef)
+    fit_coefs$coef[tmp_index] <- sub(paste0(".+genome_f", tmp_coef), "", fit_coefs$name[tmp_index])
+    fit_coefs$alt_coef[tmp_index] <- sub(paste0("d", tmp_coef), "",
+                                         sub(":genome_.+", "", fit_coefs$name[tmp_index]))
+  }
+  return(fit_coefs)
 }

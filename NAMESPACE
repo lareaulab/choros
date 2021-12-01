@@ -2,7 +2,8 @@
 ## helper.R:
 export('load_lengths', 'load_gff', 'load_fa', 'load_offsets',
        'read_fa_codons', 'get_codons', 'get_bias_seq', 'convert_to_aa',
-       'plot_diagnostic', 'calculate_codon_density', 'calculate_transcript_density')
+       'calculate_codon_density', 'calculate_transcript_density',
+       'plot_diagnostic', 'parse_coefs')
 ## prep_data.R:
 export('load_bam', "init_data", 'count_d5_d3', 'count_footprints')
 ## correct_bias.R:
@@ -10,7 +11,6 @@ export('correct_bias')
 ## evaluate_bias.R:
 export('evaluate_bias', 'plot_bias')
 ## choros.R:
-## TODO: add wrapper function for interaction
 export('choros')
 # import packages
 importFrom('parallel', 'makeCluster', 'stopCluster')

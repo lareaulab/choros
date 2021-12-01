@@ -13,6 +13,7 @@ choros <- function(bam_fname, transcript_fa_fname,
   ## num_genes: integer; number of genes used in regression model
   ## TODO: test for appropriate inputs
   ## TODO: flesh out function default settings
+  diagnostic_plot <- plot_diagnostic(bam_fname, transcript_length_fname)
   transcript_lengths <- load_lengths(transcript_length_fname)
   # 1. read in footprint alignments
   bam_data <- load_bam(bam_fname, transcript_fa_fname, transcript_length_fname,
@@ -38,6 +39,7 @@ choros <- function(bam_fname, transcript_fa_fname,
   training_data$count <- count_footprints(bam_data, training_data, "count")
   # 5. compute regression
   nb_fit <- MASS::glm.nb(model, data=training_data, model=F)
+  fit_coefs <- parse_coefs(nb_fit)
   # 6. correct counts
   bam_data$corrected_count <- correct_bias(bam_data, nb_fit)
   training_data$corrected_count <- count_footprints(bam_data, training_data, "corrected_count")
@@ -57,9 +59,11 @@ choros <- function(bam_fname, transcript_fa_fname,
                     })
   nt_corr_plots <- lapply(nt_corr, plot_bias, type="nt")
   # 8. return outputs
-  output <- list(bam_alignment = bam_data,
+  output <- list(diagnostic_plot = diagnostic_plot,
+                 bam_alignment = bam_data,
                  regression_data = training_data,
                  model_fit = nb_fit,
+                 regression_coefs = fit_coefs,
                  codon_bias = codon_corr,
                  nt_bias = nt_corr,
                  codon_plots = codon_corr_plots,

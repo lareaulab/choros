@@ -13,13 +13,16 @@ choros <- function(bam_fname, transcript_fa_fname,
   ## num_genes: integer; number of genes used in regression model
   ## TODO: test for appropriate inputs
   ## TODO: flesh out function default settings
+  print("Creating diagnostic plot")
   diagnostic_plot <- plot_diagnostic(bam_fname, transcript_length_fname)
   transcript_lengths <- load_lengths(transcript_length_fname)
   # 1. read in footprint alignments
+  print("Loading alignment file")
   bam_data <- load_bam(bam_fname, transcript_fa_fname, transcript_length_fname,
                        offsets_fname, f5_length, f3_length)
   # 2. compute size/frame subsets
-  d5_d3 <- count_d3_f3(bam_data)
+  print("Computing d5/d3 subsets")
+  d5_d3 <- count_d3_d5(bam_data)
   d5_d3_subsets <- d5_d3$counts[1:(which(d5_d3$counts$proportion>min_prop)[1]),
                                 c("d5", "d3")]
   subset_names <- sapply(seq(nrow(d5_d3_subsets)),
@@ -28,22 +31,27 @@ choros <- function(bam_fname, transcript_fa_fname,
                                  d5_d3_subsets[x], sep="_")
                          })
   # 3. choose training set: highest RPF density (RPF count / # aa)
+  print("Choosing transcripts for training")
   transcript_counts <- calculate_transcript_density(bam_dat, transcript_length_fname,
                                                     statistic=mean)
   training_set <- names(transcript_counts[1:num_genes])
   # 4. initialize data frame for regression
+  print("Initializing regression data")
   training_data <- init_data(transcript_fa_fname, transcript_length_fname,
                              d5_d3_subsets, f5_length=f5_length,
                              f3_length=f3_length, which_transcripts=training_set)
   training_data$transcript <- relevel(tunney_training$transcript, ref=training_set[1])
   training_data$count <- count_footprints(bam_data, training_data, "count")
   # 5. compute regression
+  print("Computing regression fit")
   nb_fit <- MASS::glm.nb(model, data=training_data, model=F)
   fit_coefs <- parse_coefs(nb_fit)
   # 6. correct counts
+  print("Correcting RPF counts")
   bam_data$corrected_count <- correct_bias(bam_data, nb_fit)
   training_data$corrected_count <- count_footprints(bam_data, training_data, "corrected_count")
   # 7. evaluate and plot bias
+  print("Evaluating bias")
   codon_corr <- lapply("count", "corrected_count",
                        function(x) {
                          evaluate_bias(training_data, which_column=x,

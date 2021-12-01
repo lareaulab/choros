@@ -32,7 +32,7 @@ choros <- function(bam_fname, transcript_fa_fname,
                          })
   # 3. choose training set: highest RPF density (RPF count / # aa)
   print("Choosing transcripts for training")
-  transcript_counts <- calculate_transcript_density(bam_dat, transcript_length_fname,
+  transcript_counts <- calculate_transcript_density(bam_data, transcript_length_fname,
                                                     statistic=mean)
   training_set <- names(transcript_counts[1:num_genes])
   # 4. initialize data frame for regression

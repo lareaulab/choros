@@ -281,7 +281,8 @@ calculate_codon_density <- function(bam_dat, transcript_length,
   return(counts)
 }
 
-calculate_transcript_density <- function(bam_dat, transcript_length_fname, statistic,
+calculate_transcript_density <- function(bam_dat, transcript_length_fname,
+                                         statistic=mean,
                                          exclude_codons5=10, exclude_codons3=10) {
   # compute mean/median footprint density per codon across transcript
   ## bam_dat: data.frame; output from load_bam()

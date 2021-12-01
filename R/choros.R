@@ -28,7 +28,7 @@ choros <- function(bam_fname, transcript_fa_fname,
   subset_names <- sapply(seq(nrow(d5_d3_subsets)),
                          function(x) {
                            paste("d5", d5_d3_subsets$d5[x], "d3",
-                                 d5_d3_subsets[x], sep="_")
+                                 d5_d3_subsets$d3[x], sep="_")
                          })
   # 3. choose training set: highest RPF density (RPF count / # aa)
   print("Choosing transcripts for training")

@@ -3,11 +3,11 @@
 export('load_lengths', 'load_gff', 'load_fa', 'load_offsets',
        'read_fa_codons', 'get_codons', 'get_bias_seq', 'convert_to_aa',
        'calculate_codon_density', 'calculate_transcript_density',
-       'plot_diagnostic', 'parse_coefs')
+       'plot_diagnostic', 'parse_coefs', 'parse_coefs.glmnet')
 ## prep_data.R:
 export('load_bam', "init_data", 'count_d5_d3', 'count_footprints')
 ## correct_bias.R:
-export('correct_bias')
+export('correct_bias', 'correct_bias.glmnet')
 ## evaluate_bias.R:
 export('evaluate_bias', 'plot_bias')
 ## choros.R:

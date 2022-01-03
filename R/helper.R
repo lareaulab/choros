@@ -258,7 +258,7 @@ plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
 
 calculate_codon_density <- function(bam_dat, transcript_length,
                                     exclude_codons5=10, exclude_codons3=10,
-                                    normalize=F) {
+                                    normalize=F, which_column="count") {
   # return vector of counts per codon (for individual transcript)
   ## bam_dat: data.frame; output (or subset of) from load_bam()
   ## transcript_length: integer; number of codons in transcript
@@ -319,6 +319,41 @@ parse_coefs <- function(nb_fit) {
                        })
   fit_coefs <- data.frame(name=c(names(coef(nb_fit)), ref_levels),
                           value=c(coef(nb_fit), rep(1, length(ref_levels))),
+                          type=NA, coef=NA, alt_coef=NA,
+                          row.names=NULL, stringsAsFactors=F)
+  for(tmp_coef in c("transcript", "A", "P", "E", "genome_f5", "genome_f3")) {
+    tmp_index <- grepl(paste0("^", tmp_coef), fit_coefs$name)
+    fit_coefs$type[tmp_index] <- tmp_coef
+    fit_coefs$coef[tmp_index] <- sub(paste0("^", tmp_coef), "", fit_coefs$name[tmp_index])
+  }
+  for(tmp_coef in c(3, 5)) {
+    tmp_index <- grepl(paste0("^d", tmp_coef), fit_coefs$name) & !(grepl(":", fit_coefs$name))
+    fit_coefs$type[tmp_index] <- paste0("d", tmp_coef)
+    fit_coefs$coef[tmp_index] <- sub(paste0("^d", tmp_coef), "", fit_coefs$name[tmp_index])
+    tmp_index <- grepl(paste0("^d", tmp_coef), fit_coefs$name) & (grepl(":", fit_coefs$name))
+    fit_coefs$type[tmp_index] <- paste0("d", tmp_coef, ":f", tmp_coef)
+    fit_coefs$coef[tmp_index] <- sub(paste0(".+genome_f", tmp_coef), "", fit_coefs$name[tmp_index])
+    fit_coefs$alt_coef[tmp_index] <- sub(paste0("d", tmp_coef), "",
+                                         sub(":genome_.+", "", fit_coefs$name[tmp_index]))
+  }
+  return(fit_coefs)
+}
+
+parse_coefs.glmnet <- function(glmnet_fit, lambda=NULL) {
+  # parse data.frame of regression coefficients for downstream analyses
+  ## glmnet_fit: negbin object from running glmnet()
+  ## lambda: numeric; value lambda at which coefficients are drawn
+  if(is.null(lambda)) {
+    lambda <- glmnet_fit$lambda[which.max(glmnet_fit$dev.ratio)]
+  }
+  xlevels <- unlist(glmnet_fit$xlev, recursive=F)
+  ref_levels <- sapply(seq_along(xlevels),
+                       function(x) {
+                         paste0(names(xlevels)[x], xlevels[[x]][1])
+                       })
+  fit_coefs <- coef(glmnet_fit, s=lambda)[,1]
+  fit_coefs <- data.frame(name=c(names(fit_coefs), ref_levels),
+                          value=c(fit_coefs, rep(0, length(ref_levels))),
                           type=NA, coef=NA, alt_coef=NA,
                           row.names=NULL, stringsAsFactors=F)
   for(tmp_coef in c("transcript", "A", "P", "E", "genome_f5", "genome_f3")) {

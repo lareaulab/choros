@@ -24,9 +24,9 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   }
   bam_param <- Rsamtools::ScanBamParam(tag=c("ZW", "MD"), what=features)
   alignment <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
-  num_footprints <- sum(alignment$tag.ZW)
+  num_footprints <- sum(alignment$tag.ZW, na.rm=T)
   print(paste("Read in", round(num_footprints, 1), "total RPF counts"))
-  tmp_counts <- sum(subset(alignment, is.na(rname))$tag.ZW)
+  tmp_counts <- sum(subset(alignment, is.na(rname))$tag.ZW, na.rm=T)
   print(paste("... Removing",
               round(tmp_counts, 1),
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
@@ -40,7 +40,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   alignment$frame <- (alignment$pos - alignment$utr5_length - 1) %% 3
   # 4. calculate 5' and 3' digest lengths
   offsets <- load_offsets(offsets_fname)
-  tmp_counts <- sum(subset(alignment, !(qwidth %in% unique(offsets$length)))$tag.ZW)
+  tmp_counts <- sum(subset(alignment, !(qwidth %in% unique(offsets$length)))$tag.ZW, na.rm=T)
   print(paste("... Removing",
               round(tmp_counts, 1),
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
@@ -61,7 +61,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   alignment$cds_length <- transcript_length$cds_length[match(alignment$rname,
                                                              transcript_length$transcript)]/3
   outside_cds <- ((alignment$cod_idx <= 0) | (alignment$cod_idx > alignment$cds_length))
-  tmp_counts <- sum(subset(alignment, outside_cds)$tag.ZW)
+  tmp_counts <- sum(subset(alignment, outside_cds)$tag.ZW, na.rm=T)
   print(paste("... Removing",
               round(tmp_counts, 1),
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
@@ -71,7 +71,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   alignment$rpf_f5 <- substr(alignment$seq, 1, f5_length)
   alignment$rpf_f3 <- mapply(substr, alignment$seq, alignment$qwidth-f3_length+1, alignment$qwidth)
   invalid_bias_seq <- (grepl("N", alignment$rpf_f5) | grepl("N", alignment$rpf_f3))
-  tmp_counts <- sum(subset(alignment, invalid_bias_seq)$tag.ZW)
+  tmp_counts <- sum(subset(alignment, invalid_bias_seq)$tag.ZW, na.rm=T)
   print(paste("... Removing",
               round(tmp_counts, 1),
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
@@ -88,7 +88,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
     alignment$nt_base[!grepl("^0(A|T|C|G)", as.character(alignment$tag.MD))] <- "-"
     nt_bases <- c("-", "A", "T", "C", "G")
     alignment$nt_base <- factor(alignment$nt_base, levels=nt_bases)
-    num_mismatch <- sum(subset(alignment, nt_base !="-")$tag.ZW)
+    num_mismatch <- sum(subset(alignment, nt_base !="-")$tag.ZW, na.rm=T)
     print(paste("...",
                 round(num_mismatch, 1),
                 paste0("(", round(num_mismatch / nrow(alignment) * 100, 1), "%)"),

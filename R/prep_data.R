@@ -184,7 +184,8 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
     dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length),
                                    d5_d3_subsets)
   } else {
-    dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length),
+    dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length,
+                                              stringsAsFactors=F),
                                    expand.grid(d5=digest5_lengths, d3=digest3_lengths))
   }
   chunks <- cut(seq.int(nrow(dat)), num_cores)
@@ -192,17 +193,18 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
                  .combine='rbind', .export=c("get_bias_seq")) %dopar% {
                    within(x, {
                      genome_f5 <- mapply(get_bias_seq,
-                                         as.character(transcript), cod_idx, d5, utr5_length,
+                                         transcript, cod_idx, d5, utr5_length,
                                          MoreArgs=list(transcript_seq=transcript_seq,
                                                        bias_region="f5",
                                                        bias_length=f5_length))
                      genome_f3 <- mapply(get_bias_seq,
-                                         as.character(transcript), cod_idx, d3, utr5_length,
+                                         transcript, cod_idx, d3, utr5_length,
                                          MoreArgs=list(transcript_seq=transcript_seq,
                                                        bias_region="f3",
                                                        bias_length=f3_length))
                    })
                  }
+  dat$transcript <- as.factor(dat$transcript)
   dat$d5 <- factor(dat$d5, levels=unique(d5_d3_subsets$d5))
   dat$d3 <- factor(dat$d3, levels=unique(d5_d3_subsets$d3))
   dat$genome_f5 <- as.factor(dat$genome_f5)

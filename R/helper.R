@@ -351,7 +351,7 @@ parse_coefs.glmnet <- function(glmnet_fit, lambda=NULL) {
                        function(x) {
                          paste0(names(xlevels)[x], xlevels[[x]][1])
                        })
-  fit_coefs <- coef(glmnet_fit, s=lambda)[,1]
+  fit_coefs <- glmnet::coef(glmnet_fit, s=lambda)[,1]
   fit_coefs <- data.frame(name=c(names(fit_coefs), ref_levels),
                           value=c(fit_coefs, rep(0, length(ref_levels))),
                           type=NA, coef=NA, alt_coef=NA,

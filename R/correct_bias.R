@@ -34,7 +34,7 @@ correct_bias_noInteraction <- function(dat, fit, which_column="count",
   ## which_f5: character; name of column containing 5' bias sequences to be used in correction
   ## which_f3: character; name of column containing 3' bias sequences to be used in correction
   ## fit_f5: character; prefix to f5 coefficients in fit object
-  ## fit_f3: character; frefixprefix to f3 coefficients in fit object
+  ## fit_f3: character; prefix to f3 coefficients in fit object
   # 1. establish f5 scaling factors
   f5_coefs <- coef(fit)[match(paste0(fit_f5, fit$xlevels[[fit_f5]]), names(coef(fit)))]
   names(f5_coefs) <- fit$xlevels[[fit_f5]]
@@ -64,7 +64,7 @@ correct_bias <- function(dat, intrxn_fit, which_column="count",
   ## which_f5: character; name of column containing 5' bias sequences to be used in correction
   ## which_f3: character; name of column containing 3' bias sequences to be used in correction
   ## fit_f5: character; prefix to f5 coefficients in fit object
-  ## fit_f3: character; frefixprefix to f3 coefficients in fit object
+  ## fit_f3: character; prefix to f3 coefficients in fit object
   fit_coefs <- coef(intrxn_fit)
   fit_coefs[abs(fit_coefs) > 10] <- 0
   # 1. establish f5 scaling factors
@@ -116,7 +116,7 @@ correct_bias <- function(dat, intrxn_fit, which_column="count",
   f3_indices <- prodlim::row.match(dat[, c(which_f3, "d3")], f3_coefs[, c("f3", "d3")])
   corrected_count <- dat[, which_column] / (f5_coefs$correction[f5_indices] * f3_coefs$correction[f3_indices])
   # 4. rescale predicted counts so they sum to original footprint count
-  corrected_count <- corrected_count * sum(dat[, which_column]) / sum(corrected_count, na.rm=T)
+  corrected_count <- corrected_count * sum(dat[, which_column], na.rm=T) / sum(corrected_count, na.rm=T)
   # 5. return corrected counts
   return(corrected_count)
 }
@@ -186,7 +186,7 @@ correct_bias_zinb <- function(dat, fit, which_column="count",
   ## which_f5: character; name of column containing 5' bias sequences to be used in correction
   ## which_f3: character; name of column containing 3' bias sequences to be used in correction
   ## fit_f5: character; prefix to f5 coefficients in fit object
-  ## fit_f3: character; frefixprefix to f3 coefficients in fit object
+  ## fit_f3: character; prefix to f3 coefficients in fit object
   # 1. establish f5 scaling factors
   f5_coefs <- coef(fit)[match(paste0("count_f5", levels(fit$model[[fit_f5]])), names(coef(fit)))]
   names(f5_coefs) <- levels(fit$model[[fit_f5]])

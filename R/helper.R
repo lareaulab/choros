@@ -133,7 +133,7 @@ get_bias_seq <- function(transcript_name, cod_idx, digest_length, utr5_length,
       seq_start <- seq_end - bias_length + 1
     }
   }
-  bias_seq <- substr(transcript_seq[transcript_name], seq_start, seq_end)
+  bias_seq <- substr(transcript_seq[as.character(transcript_name)], seq_start, seq_end)
   return(bias_seq)
 }
 
@@ -351,7 +351,7 @@ parse_coefs.glmnet <- function(glmnet_fit, lambda=NULL) {
                        function(x) {
                          paste0(names(xlevels)[x], xlevels[[x]][1])
                        })
-  fit_coefs <- glmnet::coef(glmnet_fit, s=lambda)[,1]
+  fit_coefs <- glmnet::coef.glmnet(glmnet_fit, s=lambda)[,1]
   fit_coefs <- data.frame(name=c(names(fit_coefs), ref_levels),
                           value=c(fit_coefs, rep(0, length(ref_levels))),
                           type=NA, coef=NA, alt_coef=NA,

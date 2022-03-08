@@ -46,8 +46,9 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
               "RPF counts outside length distribution"))
   alignment <- subset(alignment, qwidth %in% unique(offsets$length))
-  alignment$d5 <- offsets$offset[prodlim::row.match(alignment[,c("frame", "qwidth")],
-                                                    offsets[c("frame", "length")])]
+  alignment$d5 <- offsets$offset[match_rows(alignment, offsets,
+                                            c("frame", "qwidth"),
+                                            c("frame", "length"))]
   tmp_counts <- sum(subset(alignment, is.na(d5))$tag.ZW)
   print(paste("... Removing",
               round(tmp_counts, 1),
@@ -104,7 +105,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   }
   # 9. return genome-annotated bias sequences
   chunks <- cut(seq.int(nrow(alignment)), num_cores)
-  transcript_seq <- load_fa(transcript_fa_fname)
+  transcript_seq <- load_fasta(transcript_fa_fname)
   alignment <- foreach(x=split(alignment, chunks),
                        .combine='rbind', .export=c("get_bias_seq")) %dopar% {
                          within(x, {
@@ -146,7 +147,8 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   ## which_transcripts: character vector; transcripts selected for regression
   ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
   ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
-  transcript_seq <- load_fa(transcript_fa_fname)
+  browser()
+  transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_length <- load_lengths(transcript_length_fname)
   if(!is.null(which_transcripts)) {
     transcript_seq <- transcript_seq[which_transcripts]
@@ -178,11 +180,11 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
                                         mapply(get_codons,
                                                transcript, cod_idx, utr5_length,
                                                MoreArgs=list(transcript_seq=transcript_seq)))),
-                                 row.names=NULL)
+                                 row.names=NULL, stringsAsFactors=F)
                     }
   if(!is.null(d5_d3_subsets)) {
     dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length),
-                                   d5_d3_subsets)
+                                   d5_d3_subsets, stringsAsFactors=F)
   } else {
     dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length,
                                               stringsAsFactors=F),
@@ -248,9 +250,62 @@ count_footprints <- function(bam_dat, regression_data, which_column="count", nt_
                          data=bam_dat, FUN=sum, na.rm=T)
   }
   # add counts to regression data.frame
-  match_rows <- prodlim::row.match(regression_data[, features], bam_dat[, features])
-  counts <- bam_dat[match_rows, which_column]
+  counts <- bam_dat[match_rows(regression_data, bam_dat, features), which_column]
   counts[is.na(counts)] <- 0
   counts <- round(counts, digits=0) # return integer counts for glm.nb()
   return(counts)
+}
+
+calculate_codon_density <- function(bam_dat, transcript_length,
+                                    exclude_codons5=10, exclude_codons3=10,
+                                    normalize=F, which_column="count") {
+  # return vector of counts per codon (for individual transcript)
+  ## bam_dat: data.frame; output (or subset of) from load_bam()
+  ## transcript_length: integer; number of codons in transcript
+  ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
+  ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
+  ## normalize: logical; whether to normalize codon counts by average across transcript
+  # 1. initialize empty vector
+  counts <- rep(0, transcript_length)
+  names(counts) <- seq(transcript_length)
+  # 2. count up footprints per codon
+  bam_dat_cts <- aggregate(count ~ cod_idx, data=bam_dat, FUN=sum)
+  # 3. populate counts vector
+  counts[bam_dat_cts$cod_idx] <- bam_dat_cts$count
+  # 4. remove first and last codons
+  counts <- counts[(1+exclude_codons5):(length(counts)-exclude_codons3)]
+  # 5. normalize by average across transcript
+  if(normalize) {
+    counts / mean(counts)
+  }
+  return(counts)
+}
+
+calculate_transcript_density <- function(bam_dat, transcript_length_fname,
+                                         statistic=mean,
+                                         exclude_codons5=10, exclude_codons3=10) {
+  # compute mean/median footprint density per codon across transcript
+  ## bam_dat: data.frame; output from load_bam()
+  ## transcript_length_fname: character; file.path to transcriptome lengths file
+  ## statistic: character; function name (ex. "mean", "median")
+  ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
+  ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
+  transcript_lengths <- load_lengths(transcript_length_fname)
+  # 1. subset by transcript
+  bam_dat$transcript <- droplevels(bam_dat$transcript)
+  per_transcript <- split(bam_dat, bam_dat$transcript)
+  num_codons <- transcript_lengths$cds_length[match(names(per_transcript),
+                                                    transcript_lengths$transcript)] / 3
+  # 2. aggregate footprints by cod_idx
+  per_transcript <- lapply(seq_along(per_transcript),
+                           function(x) {
+                             calculate_codon_density(per_transcript[[x]],
+                                                     num_codons[x],
+                                                     exclude_codons5, exclude_codons3)
+                           })
+  names(per_transcript) <- levels(bam_dat$transcript)
+  # 3. calculate mean/median codon density per transcript
+  per_transcript <- sapply(per_transcript, FUN=statistic)
+  per_transcript <- sort(per_transcript, decreasing=T)
+  return(per_transcript)
 }

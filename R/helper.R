@@ -6,7 +6,7 @@ load_lengths <- function(lengths_fname) {
   return(transcript_lengths)
 }
 
-load_gff <- function(gff_fname) {
+gff_to_lengths <- function(gff_fname) {
   # load gff annotation file of gene regions
   ## gff_fname: character; file path to gff annotation file
   ## gff file requirements:
@@ -32,11 +32,11 @@ load_gff <- function(gff_fname) {
                                                           dat <- subset(gff, seqid==x & type=="UTR3")
                                                           return(dat$end - dat$start + 1)
                                                         }),
-                                   row.names=NULL)
+                                   row.names=NULL, stringsAsFactors=F)
   return(transcript_lengths)
 }
 
-load_fa <- function(transcript_fa_fname) {
+load_fasta <- function(transcript_fa_fname) {
   # load transcript sequences from genome .fa file
   ## transcripts_fa_fname: character; file path to transcriptome .fa file
   transcript_sequences <- Biostrings::readDNAStringSet(transcript_fa_fname)
@@ -48,7 +48,7 @@ load_fa <- function(transcript_fa_fname) {
   return(transcript_sequences)
 }
 
-write_fa <- function(transcript_seq, fa_fname) {
+write_fasta <- function(transcript_seq, fa_fname) {
   # write transcript sequence to .fa file
   ## transcript_seq: character vector; transcript sequences
   ### - names of transcript_seq will become header for transcript sequences
@@ -69,11 +69,11 @@ load_offsets <- function(offsets_fname) {
   return(offsets)
 }
 
-read_fa_codons <- function(transcript_fa_fname, transcript_length_fname) {
-  # read in .fa file, convert to list of vectors of codons per transcript
+read_fasta_as_codons <- function(transcript_fa_fname, transcript_length_fname) {
+  # read in .fasta file, convert to list of vectors of codons per transcript
   ## transcript_fa_fname: character; file path to transcriptome .fa file
   ## transcript_length_fname: character; file path to transcriptome lengths file
-  transcript_seq <- load_fa(transcript_fa_fname)
+  transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_lengths <- load_lengths(transcript_length_fname)
   codon_sequences <- sapply(seq_along(transcript_seq),
                             function(x) {
@@ -133,7 +133,7 @@ get_bias_seq <- function(transcript_name, cod_idx, digest_length, utr5_length,
       seq_start <- seq_end - bias_length + 1
     }
   }
-  bias_seq <- substr(transcript_seq[transcript_name], seq_start, seq_end)
+  bias_seq <- substr(transcript_seq[as.character(transcript_name)], seq_start, seq_end)
   return(bias_seq)
 }
 
@@ -143,7 +143,7 @@ convert_to_aa <- function(transcript_fa_fname, transcript_length_fname, output_f
   ## transcript_length_fname: character; file path to transcriptome lengths file
   ## output_fname: character; file.path to write output fasta amino acid sequences
   # 1. load in transcript DNA sequence
-  transcript_seq <- load_fa(transcript_fa_fname)
+  transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_lengths <- load_lengths(transcript_length_fname)
   dna_seq <- sapply(seq_along(transcript_seq),
                     function(x) {
@@ -162,156 +162,29 @@ convert_to_aa <- function(transcript_fa_fname, transcript_length_fname, output_f
   Biostrings::writeXStringSet(aa_seq, output_fname)
 }
 
-plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
-                            start_min=-20, start_max=5,
-                            stop_min=-5, stop_max=20,
-                            length_min=15, length_max=35) {
-  # return plot of footprint density around start and stop codons
-  ## bam_fname: character; file.path to bam alignment file
-  ## - must contain tag.ZW from RSEM
-  ## transcript_length_fname: character; file.path to transcript lengths file
-  ## plot_title: character; plot title
-  ## start_min: integer; 5'-most position to plot, relative to start codon
-  ## start_max: integer; 3'-most position to plot, relative to start codon
-  ## stop_min: integer; 5'-most position to plot, relative to stop codon
-  ## stop_max: integer; 3'-most position to plot, relative to stop codon
-  ## length_min: integer; minimum fragment length
-  ## length_max: integer; maximum fragment length
-  # load transcript lengths file
-  transcript_lengths <- load_lengths(transcript_length_fname)
-  # load alignment
-  features <- c("rname", "pos", "seq", "qwidth")
-  bam_param <- Rsamtools::ScanBamParam(tag=c("ZW", "MD"), what=features)
-  bam_file <- Rsamtools::BamFile(bam_fname)
-  bam_dat <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
-  # subset to alignments to transcripts
-  bam_dat <- subset(bam_dat, !is.na(rname))
-  # wrangle data
-  bam_dat$utr5_length <- transcript_lengths$utr5_length[match(bam_dat$rname,
-                                                              transcript_lengths$transcript)]
-  bam_dat$cds_length <- transcript_lengths$cds_length[match(bam_dat$rname,
-                                                            transcript_lengths$transcript)]
-  bam_dat$frame <- factor(with(bam_dat, (pos - utr5_length - 1) %% 3),
-                          levels=0:2)
-  bam_dat$start_distance <- with(bam_dat, pos-(utr5_length+1+3))
-  bam_dat$stop_distance <- with(bam_dat, (pos+qwidth+1)-(utr5_length+cds_length))
-  num_reads <- round(sum(bam_dat$tag.ZW))
-  # start codon plot
-  start_ribogrid <- subset(bam_dat, (start_distance %in% seq(start_min, start_max)) &
-                             (qwidth %in% seq(length_min, length_max)))
-  start_ribogrid <- aggregate(tag.ZW ~ start_distance + qwidth,
-                              data=start_ribogrid, FUN=sum)
-  plot_start_ribogrid <- ggplot(start_ribogrid,
-                                aes(x=start_distance, y=qwidth, fill=tag.ZW)) +
-    geom_tile(color=1) + theme_classic() +
-    scale_fill_gradient(low="white", high="blue", name="count") +
-    xlab("read 5' end to start codon (P site)") + ylab("RPF length") +
-    scale_x_continuous(breaks=seq(from=start_min, to=start_max, by=5)) +
-    scale_y_continuous(breaks=seq(from=length_min, to=length_max, by=5))
-  start_hist_dat <- aggregate(tag.ZW ~ start_distance, data=start_ribogrid, FUN=sum)
-  start_hist_dat$tag.ZW <- with(start_hist_dat, tag.ZW / sum(tag.ZW))
-  plot_start <- ggplot(start_hist_dat, aes(x=start_distance, y=tag.ZW)) +
-    geom_col() + theme_classic() +
-    xlab("distance between read 5' end and start codon") + ylab("density")
-  # stop codon plot
-  stop_ribogrid <- subset(bam_dat, (stop_distance %in% seq(stop_min, stop_max)) &
-                            (qwidth %in% seq(length_min, length_max)))
-  stop_ribogrid <- aggregate(tag.ZW ~ stop_distance + qwidth,
-                             data=stop_ribogrid, FUN=sum)
-  plot_stop_ribogrid <- ggplot(stop_ribogrid,
-                               aes(x=stop_distance, y=qwidth, fill=tag.ZW)) +
-    geom_tile(color=1) + theme_classic() +
-    scale_fill_gradient(low="white", high="blue", name="count") +
-    xlab("read 3' end to stop codon") + ylab("RPF length") +
-    scale_x_continuous(breaks=seq(from=stop_min, to=stop_max, by=5)) +
-    scale_y_continuous(breaks=seq(from=length_min, to=length_max, by=5))
-  stop_hist_dat <- aggregate(tag.ZW ~ stop_distance, data=stop_ribogrid, FUN=sum)
-  stop_hist_dat$tag.ZW <- with(stop_hist_dat, tag.ZW / sum(tag.ZW))
-  plot_stop <- ggplot(stop_hist_dat, aes(x=stop_distance, y=tag.ZW)) +
-    geom_col() + theme_classic() +
-    xlab("distance between read 5' end and stop codon") + ylab("density")
-  # histogram of fragment lengths
-  length_dat <- aggregate(tag.ZW ~ qwidth + frame, data=bam_dat, FUN=sum)
-  length_dat <- subset(length_dat, qwidth >= length_min & qwidth <= length_max)
-  plot_length <- ggplot(length_dat, aes(x=qwidth, y=tag.ZW, fill=frame)) +
-    geom_col() + theme_classic() + xlab("fragment length (nt)") + ylab("") +
-    ggtitle(plot_title, subtitle=paste("n =", num_reads, "footprints")) +
-    scale_fill_manual(values=RColorBrewer::brewer.pal(3, "Set1")) +
-    theme(legend.position="right")
-  # frame v. length plot
-  frame_length_dat <- aggregate(tag.ZW ~ qwidth + frame, data=bam_dat, FUN=sum)
-  plot_frame_length <- ggplot(frame_length_dat, aes(x=frame, y=qwidth, fill=tag.ZW)) +
-    geom_tile(color=1) + theme_classic() + coord_fixed(ratio=1) +
-    scale_fill_gradient(low="white", high="blue", name="count") +
-    xlab("frame") + ylab("RPF length")
-  # return plots
-  aggregate_plot <- plot_length +
-    plot_start + plot_stop +
-    plot_start_ribogrid + plot_stop_ribogrid +
-    plot_frame_length +
-    plot_layout(design="
-                11116
-                22336
-                44556")
-  return(aggregate_plot)
-}
-
-calculate_codon_density <- function(bam_dat, transcript_length,
-                                    exclude_codons5=10, exclude_codons3=10,
-                                    normalize=F, which_column="count") {
-  # return vector of counts per codon (for individual transcript)
-  ## bam_dat: data.frame; output (or subset of) from load_bam()
-  ## transcript_length: integer; number of codons in transcript
-  ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
-  ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
-  ## normalize: logical; whether to normalize codon counts by average across transcript
-  # 1. initialize empty vector
-  counts <- rep(0, transcript_length)
-  names(counts) <- seq(transcript_length)
-  # 2. count up footprints per codon
-  bam_dat_cts <- aggregate(count ~ cod_idx, data=bam_dat, FUN=sum)
-  # 3. populate counts vector
-  counts[bam_dat_cts$cod_idx] <- bam_dat_cts$count
-  # 4. remove first and last codons
-  counts <- counts[(1+exclude_codons5):(length(counts)-exclude_codons3)]
-  # 5. normalize by average across transcript
-  if(normalize) {
-    counts / mean(counts)
+match_rows <- function(x, y, x_col=NULL, y_col=NULL) {
+  # return row numbers of (first) matches of x in y
+  ## x: data.frame
+  ## y: data.frame
+  ## x_col: character vector of columns to be used; NULL to use all columns
+  ## y_col: character vector of columns corresponding to x_col; NULL to use x_col
+  if(is.null(x_col)) {
+    x_col <- colnames(x)
   }
-  return(counts)
+  if(is.null(y_col)) {
+    y_col <- x_col
+  }
+  x_terms <- apply(x[, x_col], 1, paste, collapse="\r")
+  y_terms <- apply(y[, y_col], 1, paste, collapse="\r")
+  match(x_terms, y_terms)
 }
 
-calculate_transcript_density <- function(bam_dat, transcript_length_fname,
-                                         statistic=mean,
-                                         exclude_codons5=10, exclude_codons3=10) {
-  # compute mean/median footprint density per codon across transcript
-  ## bam_dat: data.frame; output from load_bam()
-  ## transcript_length_fname: character; file.path to transcriptome lengths file
-  ## statistic: character; function name (ex. "mean", "median")
-  ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
-  ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
-  transcript_lengths <- load_lengths(transcript_length_fname)
-  # 1. subset by transcript
-  bam_dat$transcript <- droplevels(bam_dat$transcript)
-  per_transcript <- split(bam_dat, bam_dat$transcript)
-  num_codons <- transcript_lengths$cds_length[match(names(per_transcript),
-                                                    transcript_lengths$transcript)] / 3
-  # 2. aggregate footprints by cod_idx
-  per_transcript <- lapply(seq_along(per_transcript),
-                           function(x) {
-                             calculate_codon_density(per_transcript[[x]],
-                                                     num_codons[x],
-                                                     exclude_codons5, exclude_codons3)
-                           })
-  names(per_transcript) <- levels(bam_dat$transcript)
-  # 3. calculate mean/median codon density per transcript
-  per_transcript <- sapply(per_transcript, FUN=statistic)
-  per_transcript <- sort(per_transcript, decreasing=T)
-  return(per_transcript)
+parse_coefs <- function(x) {
+  UseMethod("parse_coefs")
 }
 
-parse_coefs <- function(nb_fit) {
-  # prase data.frame of regression coefficients for downstream analyses
+parse_coefs.negbin <- function(nb_fit) {
+  # parse data.frame of regression coefficients for downstream analyses
   ## nb_fit: negbin object from running glm.nb()
   ref_levels <- sapply(seq_along(names(nb_fit$xlevels)),
                        function(x) {
@@ -373,3 +246,5 @@ parse_coefs.glmnet <- function(glmnet_fit, lambda=NULL) {
   }
   return(fit_coefs)
 }
+
+

@@ -1,15 +1,17 @@
 # export functions
 ## helper.R:
-export('load_lengths', 'load_gff', 'load_fa', 'load_offsets',
-       'read_fa_codons', 'get_codons', 'get_bias_seq', 'convert_to_aa',
-       'calculate_codon_density', 'calculate_transcript_density',
-       'plot_diagnostic', 'parse_coefs', 'parse_coefs.glmnet')
+export('load_lengths', 'gff_to_lengths', 'load_fasta', 'write_fasta',
+       'load_offsets', 'read_fasta_as_codons', 'get_codons', 'get_bias_seq',
+       'convert_to_aa', 'parse_coefs')
 ## prep_data.R:
-export('load_bam', "init_data", 'count_d5_d3', 'count_footprints')
+export('load_bam', "init_data", 'count_d5_d3', 'count_footprints',
+       'calculate_codon_density', 'calculate_transcript_density',)
 ## correct_bias.R:
-export('correct_bias', 'correct_bias.glmnet')
+export('correct_bias')
 ## evaluate_bias.R:
-export('evaluate_bias', 'plot_bias')
+export('evaluate_bias')
+## make_plots.R:
+export('plot_diagnostic', 'plot_bias')
 ## choros.R:
 export('choros')
 # import packages
@@ -17,7 +19,6 @@ importFrom('parallel', 'makeCluster', 'stopCluster')
 importFrom('doParallel', "registerDoParallel")
 import('foreach')
 importFrom('reshape', 'expand.grid.df')
-importFrom('prodlim', 'row.match')
 importFrom('Rsamtools', 'BamFile', 'ScanBamParam', 'scanBam')
 import('ggplot2')
 importFrom('MASS', 'glm.nb')

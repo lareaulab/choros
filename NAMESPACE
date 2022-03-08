@@ -26,4 +26,4 @@ importFrom('Biostrings', 'DNAStringSet', 'readDNAStringSet',
            'writeXStringSet', 'translate')
 import('patchwork')
 import('RColorBrewer')
-import("glmnet")
+importFrom('glmnet', 'coef.glmnet')

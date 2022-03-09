@@ -142,3 +142,43 @@ plot_bias <- function(model_metric, plot_title="", plot_subtitle="",
   }
   return(bias_plot)
 }
+
+plot_coefs <- function(model_coefs, plot_type="violin",
+                       volcano_term="A", conf_int=0.95,
+                       p_adj_method="fdr", p_adj_group=c("all", "subset_only")) {
+  # make violin plot of regression coefficients
+  ## model_coefs: data.frame; output of parse_coefs()
+  ## plot_type: character; one of c("violin")
+  if(plot_type=="violin") {
+    model_coefs <- subset(model_coefs, !is.na(model_coefs$group))
+    model_coefs$group <- factor(model_coefs$group,
+                                levels=unique(model_coefs$group))
+    return(ggplot(subset(model_coefs, !is.na(model_coefs$group)),
+                  aes(x=group, y=estimate, fill=group)) +
+             geom_hline(yintercept=0) + geom_violin() +
+             theme_classic() + guides(fill="none") +
+             xlab("") + ylab(expr(beta)) +
+             theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5)))
+  }
+  if(plot_type=="volcano") {
+    if(p_adj_group == "subset_only") {
+      model_coefs <- subset(model_coefs, group_1==volcano_term)
+    }
+    model_coefs$p_adj <- p.adjust(model_coefs$p, method=p_adj_method)
+    model_coefs$p_signif <- ifelse(model_coefs$p_adj<(1-conf_int),
+                                   paste("p_adj <", 1-conf_int),
+                                   paste("p_adj >=", 1-conf_int))
+    color_legend <- c("red", "black")
+    names(color_legend) <- c(paste("p_adj <", 1-conf_int),
+                             paste("p_adj >=", 1-conf_int))
+    return(ggplot(subset(model_coefs, group_1==volcano_term),
+                  aes(x=estimate, y=-log10(p),
+                      xmin=estimate+qnorm((1-conf_int)/2)*std_error,
+                      xmax=estimate+qnorm(1-(1-conf_int)/2)*std_error,
+                      col=p_signif)) +
+             geom_point() + geom_errorbarh(alpha=0.5) +
+             geom_hline(yintercept=0) + geom_vline(xintercept=0) +
+             theme_classic() + labs(col="") + scale_color_manual(values=color_legend) +
+             xlab(expr(beta)) + ylab("-log10(p)"))
+  }
+}

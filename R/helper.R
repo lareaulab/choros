@@ -174,8 +174,8 @@ match_rows <- function(x, y, x_col=NULL, y_col=NULL) {
   if(is.null(y_col)) {
     y_col <- x_col
   }
-  x_terms <- apply(x[, x_col], 1, paste, collapse="\r")
-  y_terms <- apply(y[, y_col], 1, paste, collapse="\r")
+  x_terms <- do.call(paste, c(x[, x_col], sep="\r"))
+  y_terms <- do.call(paste, c(y[, y_col], sep="\r"))
   match(x_terms, y_terms)
 }
 

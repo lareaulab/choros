@@ -66,7 +66,6 @@ correct_bias <- function(dat, intrxn_fit, which_column="count",
   ## fit_f5: character; prefix to f5 coefficients in fit object
   ## fit_f3: character; prefix to f3 coefficients in fit object
   fit_coefs <- coef(intrxn_fit)
-  fit_coefs[abs(fit_coefs) > 10] <- 0
   # 1. establish f5 scaling factors
   f5_ref <- intrxn_fit$xlevels[[fit_f5]][1]
   d5_ref <- intrxn_fit$xlevels$d5[1]

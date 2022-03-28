@@ -84,8 +84,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
                          })
                        }
   # return data
-  subset_features <- c("transcript", "cod_idx", "d5", "d3", "rpf_f5", "rpf_f3",
-                       "genome_f5", "genome_f3", "count")
+  subset_features <- c("transcript", "cod_idx", "d5", "d3", "genome_f5", "genome_f3", "count")
   if(!full) { alignment <- alignment[, subset_features] }
   return(alignment)
 }

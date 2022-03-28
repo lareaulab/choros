@@ -114,26 +114,20 @@ get_codons <- function(transcript_name, cod_idx, utr5_length, transcript_seq) {
   return(codons)
 }
 
-get_bias_seq <- function(transcript_name, cod_idx, digest_length, utr5_length,
-                         transcript_seq, bias_region, bias_length=2) {
-  # get bias sequence at end of footprint
-  ## transcript_name: character; transcript name, corresponds with item in names(transcript_seq)
-  ## cod_idx: integer; index of A site codon
-  ## digest_length: integer; d5 or d3 length between A site and footprint end
-  ## utr5_length: integer; length of 5' UTR region (from lengths file)
-  ## transcript_seq: character vector; transcript sequences (+ 5' and 3' UTR regions)
-  ## bias_region: character; f5 or f3 (corresponding to 5' or 3' bias sequence)
+get_bias_seq <- function(dat, transcript_seq, bias_region, bias_length=3) {
+  # dat: data.frame; contains columns c("transcript", "cod_idx", "d5", "d3", "utr5_length")
+  ## transcript_seq: character; output from load_fasta()
+  ## bias_region: character vector; one of "f5" or "f3" (corresponding to 5' or 3' bias sequence)
   ## bias_length: integer; length of bias sequence
   if(bias_region=="f5") {
-    seq_start <- utr5_length + 3*(cod_idx-1)+1 - digest_length
+    seq_start <- with(dat, utr5_length + 3*(cod_idx-1)+1 - d5)
     seq_end <- seq_start + bias_length - 1
   } else {
-    if(bias_region=="f3") {
-      seq_end <- utr5_length + 3*cod_idx + digest_length
-      seq_start <- seq_end - bias_length + 1
-    }
+    seq_end <- with(dat, utr5_length + 3*cod_idx + d3)
+    seq_start <- seq_end - bias_length + 1
   }
-  bias_seq <- substr(transcript_seq[as.character(transcript_name)], seq_start, seq_end)
+  bias_seq <- mapply(substr, transcript_seq[as.character(dat$transcript)],
+                     seq_start, seq_end)
   return(bias_seq)
 }
 

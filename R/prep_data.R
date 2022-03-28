@@ -1,5 +1,5 @@
 load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, offsets_fname,
-                     f5_length=2, f3_length=3, full=F, nt_base=F, num_cores=NULL) {
+                     f5_length=3, f3_length=3, full=F, num_cores=NULL) {
   # calculate proportion of footprints within each 5' and 3' digest length combination
   ## bam_fname: character; file.path to .bam alignment file
   ## transcript_fa_fname: character; file path to transcriptome .fa file
@@ -68,62 +68,22 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
               "footprints outside CDS"))
   alignment <- subset(alignment, !outside_cds)
-  # 7. pull bias sequences
-  alignment$rpf_f5 <- substr(alignment$seq, 1, f5_length)
-  alignment$rpf_f3 <- mapply(substr, alignment$seq, alignment$qwidth-f3_length+1, alignment$qwidth)
-  invalid_bias_seq <- (grepl("N", alignment$rpf_f5) | grepl("N", alignment$rpf_f3))
-  tmp_counts <- sum(subset(alignment, invalid_bias_seq)$tag.ZW, na.rm=T)
-  print(paste("... Removing",
-              round(tmp_counts, 1),
-              paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
-              "footprints with N in bias region"))
-  alignment <- subset(alignment, !invalid_bias_seq)
-  alignment$rpf_f5 <- factor(alignment$rpf_f5)
-  alignment$rpf_f3 <- factor(alignment$rpf_f3)
-  # 8. aggregate alignments
+  # 7. aggregate alignments
   alignment <- aggregate(tag.ZW ~ rname + utr5_length + cod_idx + d5 + d3 + rpf_f5 + rpf_f3,
                          data=alignment, FUN=sum)
-  # 8. return nt_base
-  if(nt_base) {
-    alignment$nt_base <- substr(as.character(alignment$rpf_f5), 1, 1)
-    alignment$nt_base[!grepl("^0(A|T|C|G)", as.character(alignment$tag.MD))] <- "-"
-    nt_bases <- c("-", "A", "T", "C", "G")
-    alignment$nt_base <- factor(alignment$nt_base, levels=nt_bases)
-    num_mismatch <- sum(subset(alignment, nt_base !="-")$tag.ZW, na.rm=T)
-    print(paste("...",
-                round(num_mismatch, 1),
-                paste0("(", round(num_mismatch / nrow(alignment) * 100, 1), "%)"),
-                "footprints with non-templated 5' base"))
-    for(nt in nt_bases[-1]) {
-      print(paste("...",
-                  sum(alignment$nt_base == nt),
-                  paste0("(", round(sum(alignment$nt_base==nt) / num_mismatch * 100, 1), "%)")))
-    }
-    alignment$nt_d5 <- alignment$d5
-    which_ntBase <- which(as.character(alignment$nt_base) != "-")
-    alignment$nt_d5[which_ntBase] <- alignment$nt_d5[which_ntBase] - 1
-  }
-  # 9. return genome-annotated bias sequences
+  colnames(alignment)[colnames(alignment)=="rname"] <- "transcript"
+  colnames(alignment)[colnames(alignment)=="tag.ZW"] <- "count"
+  # 8. return genome-annotated bias sequences
   chunks <- cut(seq.int(nrow(alignment)), num_cores)
   transcript_seq <- load_fasta(transcript_fa_fname)
   alignment <- foreach(x=split(alignment, chunks),
                        .combine='rbind', .export=c("get_bias_seq")) %dopar% {
                          within(x, {
-                           genome_f5 <- mapply(get_bias_seq,
-                                               as.character(rname), cod_idx, d5, utr5_length,
-                                               MoreArgs=list(transcript_seq=transcript_seq,
-                                                             bias_region="f5",
-                                                             bias_length=f5_length))
-                           genome_f3 <- mapply(get_bias_seq,
-                                               as.character(rname), cod_idx, d3, utr5_length,
-                                               MoreArgs=list(transcript_seq=transcript_seq,
-                                                             bias_region="f3",
-                                                             bias_length=f3_length))
+                           genome_f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length)
+                           genome_f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length)
                          })
                        }
   # return data
-  colnames(alignment)[colnames(alignment)=="rname"] <- "transcript"
-  colnames(alignment)[colnames(alignment)=="tag.ZW"] <- "count"
   subset_features <- c("transcript", "cod_idx", "d5", "d3", "rpf_f5", "rpf_f3",
                        "genome_f5", "genome_f3", "count")
   if(nt_base) { subset_features <- c(subset_features, "nt_base", "nt_d5") }
@@ -147,7 +107,6 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   ## which_transcripts: character vector; transcripts selected for regression
   ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
   ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
-  browser()
   transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_length <- load_lengths(transcript_length_fname)
   if(!is.null(which_transcripts)) {
@@ -194,16 +153,8 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   dat <- foreach(x=split(dat, chunks),
                  .combine='rbind', .export=c("get_bias_seq")) %dopar% {
                    within(x, {
-                     genome_f5 <- mapply(get_bias_seq,
-                                         transcript, cod_idx, d5, utr5_length,
-                                         MoreArgs=list(transcript_seq=transcript_seq,
-                                                       bias_region="f5",
-                                                       bias_length=f5_length))
-                     genome_f3 <- mapply(get_bias_seq,
-                                         transcript, cod_idx, d3, utr5_length,
-                                         MoreArgs=list(transcript_seq=transcript_seq,
-                                                       bias_region="f3",
-                                                       bias_length=f3_length))
+                     genome_f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length)
+                     genome_f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length)
                    })
                  }
   dat$transcript <- as.factor(dat$transcript)

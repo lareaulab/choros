@@ -69,7 +69,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
               "footprints outside CDS"))
   alignment <- subset(alignment, !outside_cds)
   # 7. aggregate alignments
-  alignment <- aggregate(tag.ZW ~ rname + utr5_length + cod_idx + d5 + d3 + rpf_f5 + rpf_f3,
+  alignment <- aggregate(tag.ZW ~ rname + utr5_length + cod_idx + d5 + d3,
                          data=alignment, FUN=sum)
   colnames(alignment)[colnames(alignment)=="rname"] <- "transcript"
   colnames(alignment)[colnames(alignment)=="tag.ZW"] <- "count"

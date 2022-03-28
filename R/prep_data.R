@@ -105,6 +105,7 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   ## which_transcripts: character vector; transcripts selected for regression
   ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
   ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
+  browser()
   transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_length <- load_lengths(transcript_length_fname)
   if(!is.null(which_transcripts)) {
@@ -140,8 +141,9 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
                                  row.names=NULL, stringsAsFactors=F)
                     }
   if(!is.null(d5_d3_subsets)) {
-    dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length),
-                                   d5_d3_subsets, stringsAsFactors=F)
+    dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length,
+                                              stringsAsFactors=F),
+                                   d5_d3_subsets)
   } else {
     dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length,
                                               stringsAsFactors=F),

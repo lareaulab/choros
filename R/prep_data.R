@@ -260,12 +260,15 @@ calculate_transcript_density <- function(bam_dat, transcript_length_fname,
   return(per_transcript)
 }
 
-compute_rpf_gc <- function(dat, omit="A", transcript_seq, transcript_lengths) {
+compute_rpf_gc <- function(dat, omit="APE",
+                           transcript_seq_fname, transcript_lengths_fname) {
   # compute GC content in RPF, omitting A/P/E sites
   # dat: data.frame; contains columns c("transcript", "cod_idx", "d5", "d3")
   ## omit: character; which codon sites to omit, one of c("A", "AP", "APE")
-  ## transcript_seq: named character vector; output from load_fasta()
-  ## transcript_lengths: data.frame; output from load_lengths()
+  ## transcript_seq_fname: character; file path to transcriptome fasta file
+  ## transcript_lengths_fname: character; file path to transcript lengths file
+  transcript_seq <- load_fasta(transcript_seq_fname)
+  transcript_lengths <- load_lengths(transcript_lengths_fname)
   utr5_lengths <- transcript_lengths$utr5_length
   names(utr5_lengths) <- transcript_lengths$transcript
   A_start <- utr5_lengths[as.character(dat$transcript)] + 1 + 3*(dat$cod_idx-1)

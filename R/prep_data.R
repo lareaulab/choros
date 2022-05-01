@@ -1,5 +1,5 @@
 load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, offsets_fname,
-                     f5_length=3, f3_length=3, full=F, num_cores=NULL) {
+                     f5_length=3, f3_length=3, full=F, num_cores=NULL, compute_gc=T) {
   # calculate proportion of footprints within each 5' and 3' digest length combination
   ## bam_fname: character; file.path to .bam alignment file
   ## transcript_fa_fname: character; file path to transcriptome .fa file
@@ -258,4 +258,35 @@ calculate_transcript_density <- function(bam_dat, transcript_length_fname,
   per_transcript <- sapply(per_transcript, FUN=statistic)
   per_transcript <- sort(per_transcript, decreasing=T)
   return(per_transcript)
+}
+
+compute_rpf_gc <- function(dat, omit="A", transcript_seq, transcript_lengths) {
+  # compute GC content in RPF, omitting A/P/E sites
+  # dat: data.frame; contains columns c("transcript", "cod_idx", "d5", "d3")
+  ## omit: character; which codon sites to omit, one of c("A", "AP", "APE")
+  ## transcript_seq: named character vector; output from load_fasta()
+  ## transcript_lengths: data.frame; output from load_lengths()
+  utr5_lengths <- transcript_lengths$utr5_length
+  names(utr5_lengths) <- transcript_lengths$transcript
+  A_start <- utr5_lengths[as.character(dat$transcript)] + 1 + 3*(dat$cod_idx-1)
+  num_omit_codons <- ifelse(grepl("E", omit), 2,
+                            ifelse(grepl("P", omit), 1, 0))
+  dat$d5 <- as.numeric(as.character(dat$d5))
+  dat$d3 <- as.numeric(as.character(dat$d3))
+  # 1. extract RPF 5' regions
+  rpf_5_start <- A_start - dat$d5
+  rpf_5_end <- A_start - 1 - 3*num_omit_codons
+  rpf_5 <- mapply(substr, transcript_seq[as.character(dat$transcript)],
+                  rpf_5_start, rpf_5_end)
+  # 2. extract RPF 3' regions
+  rpf_3_start <- A_start + 3
+  rpf_3_end <- A_start + 2 + dat$d3
+  rpf_3 <- mapply(substr, transcript_seq[as.character(dat$transcript)],
+                  rpf_3_start, rpf_3_end)
+  # 3. compute GC content
+  rpf_regions <- paste0(rpf_5, rpf_3)
+  gc_content <- strsplit(rpf_regions, split="")
+  gc_content <- sapply(gc_content, function(x) sum(x %in% c("G", "C")))
+  gc_content <- gc_content / with(dat, d5 + d3 + 3)
+  return(gc_content)
 }

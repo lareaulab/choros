@@ -364,15 +364,16 @@ correct_gc <- function(dat, intrxn_fit, which_column="count") {
   ## dat: data.frame containing regression predictors
   ## intrxn_fit: glm object ; output from MASS::glm.nb()
   ## which_column: character; name of column containing uncorrected counts
+  total_count <- sum(dat[, which_column], na.rm=T)
   # 1. pull out regression coefficient for GC content
   fit_coefs <- coef(intrxn_fit)
   coef_gc <- fit_coefs[names(fit_coefs)=="gc"]
   # 2. compute mean %GC for dataset
-  mean_gc <- sum(dat[, which_column]*dat$gc)/sum(dat[, which_column])
+  mean_gc <- sum(dat[, which_column]*dat$gc, na.rm=T) / total_count
   # 3. calculate corrected counts
   corrected_count <- exp(log(dat[, which_column]) + coef_gc*mean_gc - coef_gc*dat$gc)
   # 4. rescale predicted counts so they sum to original footprint count
-  corrected_count <- corrected_count * sum(dat[, which_column], na.rm=T) / sum(corrected_count, na.rm=T)
+  corrected_count <- corrected_count * total_count / sum(corrected_count, na.rm=T)
   # 5. return corrected counts
   return(corrected_count)
 }

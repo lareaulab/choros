@@ -17,31 +17,35 @@ evaluate_bias <- function(dat, which_column="count",
   ##### norm: norm of regression coefficients at that position
   transcripts_seq <- read_fasta_as_codons(transcripts_fa_fname, transcripts_length_fname)
   transcripts_lengths <- load_lengths(transcripts_length_fname)
+  transcripts_lengths$num_codons <- with(transcripts_lengths, cds_length/3)
   # 1. aggregate counts by codon
-  cts_by_codon <- aggregate(formula(paste(which_column, "~ transcript + cod_idx")),
-                            data=dat, FUN=sum, na.rm=T)
-  # 2. remove truncated codons, scale footprint counts by transcript mean
+  codon_cts <- aggregate(formula(paste(which_column, "~ transcript + cod_idx")),
+                         data=dat, FUN=sum, na.rm=T)
+  # remove truncated positions, flesh out unobserved positions
   transcripts <- levels(dat$transcript)
-  cts_by_codon_trunc <- lapply(transcripts,
-                               function(x) {
-                                 tmp_subset <- subset(cts_by_codon, transcript==x)
-                                 # remove trunc5 and trunc3 codons
-                                 num_codons <- transcripts_lengths$cds_length[transcripts_lengths$transcript==x]/3
-                                 tmp_subset <- subset(tmp_subset,
-                                                      cod_idx > trunc5 & cod_idx <= (num_codons-trunc3))
-                                 # scale per-codon counts by transcript mean
-                                 tmp_subset[, which_column] <- tmp_subset[, which_column] / mean(tmp_subset[, which_column])
-                                 # return truncated & scaled counts
-                                 return(tmp_subset)
-                               })
-  cts_by_codon <- do.call(rbind, cts_by_codon_trunc)
-  ##### remove transcripts with NA counts (mean = 0?)
-  ## TODO: error message
-  bad_transcript <- which(sapply(cts_by_codon_trunc, function(x) any(is.na(x[, which_column]))))
-  cts_by_codon_trunc <- sapply(bad_transcript, function(x) cts_by_codon_trunc[[x]]$transcript)
-  cts_by_codon <- subset(cts_by_codon, !(transcript %in% as.character(cts_by_codon_trunc)))
+  cts_by_codon <- lapply(transcripts,
+                         function(x) {
+                           num_codons <- transcripts_lengths$num_codons[transcripts_lengths$transcript==x]
+                           return(data.frame(transcript=x,
+                                             cod_idx=seq(trunc5+1, num_codons-trunc3)))
+                         })
+  cts_by_codon <- do.call(rbind, cts_by_codon)
+  cts_by_codon$count <- codon_cts$count[match_rows(cts_by_codon, codon_cts)]
+  cts_by_codon$count[is.na(cts_by_codon$count)] <- 0
+  # 2. scale footprint counts by transcript mean
+  cts_by_codon <- split(cts_by_codon, cts_by_codon$transcript)
+  cts_by_codon <- lapply(cts_by_codon,
+                         function(x) {
+                           if(sum(x$count) == 0) {
+                             print("ERROR: no footprints observed!")
+                             return(NULL)
+                           } else {
+                             within(x, count <- count/mean(count, na.rm=T))
+                           }
+                         })
+  cts_by_codon <- do.call(rbind, cts_by_codon)
   # 3. make data.frame for iXnos regression
-  codons <- data.frame(t(sapply(1:nrow(cts_by_codon),
+  codons <- data.frame(t(sapply(seq(nrow(cts_by_codon)),
                                 function(x) {
                                   transcript <- as.character(cts_by_codon$transcript[x])
                                   cod_idx <- cts_by_codon$cod_idx[x] - 1 # transcripts_seq uses 0-based indexing

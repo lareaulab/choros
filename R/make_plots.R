@@ -30,7 +30,7 @@ plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
   bam_dat$frame <- factor(with(bam_dat, (pos - utr5_length - 1) %% 3),
                           levels=0:2)
   bam_dat$start_distance <- with(bam_dat, pos-(utr5_length+1+3))
-  bam_dat$stop_distance <- with(bam_dat, (pos+qwidth+1)-(utr5_length+cds_length))
+  bam_dat$stop_distance <- with(bam_dat, (pos+qwidth-1)-(utr5_length+cds_length))
   num_reads <- round(sum(bam_dat$tag.ZW))
   # start codon plot
   start_ribogrid <- subset(bam_dat, (start_distance %in% seq(start_min, start_max)) &

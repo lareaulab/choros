@@ -65,7 +65,7 @@ plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
   stop_hist_dat$tag.ZW <- with(stop_hist_dat, tag.ZW / sum(tag.ZW))
   plot_stop <- ggplot(stop_hist_dat, aes(x=stop_distance, y=tag.ZW)) +
     geom_col() + theme_classic() +
-    xlab("distance between read 5' end and stop codon") + ylab("density")
+    xlab("distance between read 3' end and stop codon") + ylab("density")
   # histogram of fragment lengths
   length_dat <- aggregate(tag.ZW ~ qwidth + frame, data=bam_dat, FUN=sum)
   length_dat <- subset(length_dat, qwidth >= length_min & qwidth <= length_max)

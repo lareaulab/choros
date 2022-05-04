@@ -120,6 +120,55 @@ correct_bias <- function(dat, intrxn_fit, which_column="count",
   return(corrected_count)
 }
 
+correct_bias_nod3 <- function(dat, intrxn_fit, which_column="count",
+                         which_f5="genome_f5", which_f3="genome_f3",
+                         fit_f5="genome_f5", fit_f3="genome_f3") {
+  # correct biased counts with coefficients from interaction regression model
+  ## dat: data.frame containing regression predictors
+  ## intrxn_fit: glm object ; output from MASS::glm.nb()
+  ## which_column: character; name of column containing uncorrected counts
+  ## which_f5: character; name of column containing 5' bias sequences to be used in correction
+  ## which_f3: character; name of column containing 3' bias sequences to be used in correction
+  ## fit_f5: character; prefix to f5 coefficients in fit object
+  ## fit_f3: character; prefix to f3 coefficients in fit object
+  fit_coefs <- coef(intrxn_fit)
+  # 1. establish f5 scaling factors
+  f5_ref <- intrxn_fit$xlevels[[fit_f5]][1]
+  d5_ref <- intrxn_fit$xlevels$d5[1]
+  f5_coefs <- expand.grid(f5=intrxn_fit$xlevels[[fit_f5]], d5=intrxn_fit$xlevels$d5, stringsAsFactors=F)
+  f5_coefs$correction <- sapply(seq(nrow(f5_coefs)),
+                                function(x) {
+                                  tmp_f5 <- f5_coefs$f5[x]
+                                  tmp_d5 <- f5_coefs$d5[x]
+                                  if(tmp_f5 == f5_ref) {
+                                    tmp_coef <- 0
+                                  } else {
+                                    tmp_coef <- fit_coefs[paste0(fit_f5, tmp_f5)]
+                                  }
+                                  if(tmp_d5 != d5_ref & tmp_f5 != f5_ref) {
+                                    tmp_intrxn <- paste0("d5", tmp_d5, ":", fit_f5, tmp_f5)
+                                    if(!is.na(fit_coefs[tmp_intrxn])) {
+                                      tmp_coef <- tmp_coef + fit_coefs[tmp_intrxn]
+                                    }
+                                  }
+                                  return(tmp_coef)
+                                })
+  f5_coefs$correction <- exp(f5_coefs$correction)
+  # 2. establish f3 scaling factors
+  f3_coefs <- coef(fit)[match(paste0(fit_f3, fit$xlevels[[fit_f3]]), names(coef(fit)))]
+  names(f3_coefs) <- fit$xlevels[[fit_f3]]
+  f3_coefs[is.na(f3_coefs)] <- 0
+  f3_coefs <- exp(f3_coefs)
+  # 3. calculate corrected counts
+  f5_indices <- match_rows(dat, f5_coefs, c(which_f5, "d5"), c("f5", "d5"))
+  f3_indices <- match_rows(dat, f3_coefs, c(which_f3, "d3"), c("f3", "d3"))
+  corrected_count <- dat[, which_column] / (f5_coefs$correction[f5_indices] * f3_coefs[as.character(dat[, which_f3])])
+  # 4. rescale predicted counts so they sum to original footprint count
+  corrected_count <- corrected_count * sum(dat[, which_column], na.rm=T) / sum(corrected_count, na.rm=T)
+  # 5. return corrected counts
+  return(corrected_count)
+}
+
 correct_bias_frameBySize <- function(dat, nb_fits, which_column="count",
                                      which_f5="genome_f5", which_f3="genome_f3",
                                      fit_f5="genome_f5", fit_f3="genome_f3") {

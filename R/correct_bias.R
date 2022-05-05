@@ -155,13 +155,12 @@ correct_bias_nod3 <- function(dat, intrxn_fit, which_column="count",
                                 })
   f5_coefs$correction <- exp(f5_coefs$correction)
   # 2. establish f3 scaling factors
-  f3_coefs <- coef(fit)[match(paste0(fit_f3, fit$xlevels[[fit_f3]]), names(coef(fit)))]
-  names(f3_coefs) <- fit$xlevels[[fit_f3]]
+  f3_coefs <- coef(intrxn_fit)[match(paste0(fit_f3, intrxn_fit$xlevels[[fit_f3]]), names(coef(intrxn_fit)))]
+  names(f3_coefs) <- intrxn_fit$xlevels[[fit_f3]]
   f3_coefs[is.na(f3_coefs)] <- 0
   f3_coefs <- exp(f3_coefs)
   # 3. calculate corrected counts
   f5_indices <- match_rows(dat, f5_coefs, c(which_f5, "d5"), c("f5", "d5"))
-  f3_indices <- match_rows(dat, f3_coefs, c(which_f3, "d3"), c("f3", "d3"))
   corrected_count <- dat[, which_column] / (f5_coefs$correction[f5_indices] * f3_coefs[as.character(dat[, which_f3])])
   # 4. rescale predicted counts so they sum to original footprint count
   corrected_count <- corrected_count * sum(dat[, which_column], na.rm=T) / sum(corrected_count, na.rm=T)

@@ -30,7 +30,7 @@ evaluate_bias <- function(dat, which_column="count",
                                              cod_idx=seq(trunc5+1, num_codons-trunc3)))
                          })
   cts_by_codon <- do.call(rbind, cts_by_codon)
-  cts_by_codon$count <- codon_cts$count[match_rows(cts_by_codon, codon_cts)]
+  cts_by_codon$count <- codon_cts[[which_column]][match_rows(cts_by_codon, codon_cts)]
   cts_by_codon$count[is.na(cts_by_codon$count)] <- 0
   # 2. scale footprint counts by transcript mean
   cts_by_codon <- split(cts_by_codon, cts_by_codon$transcript)

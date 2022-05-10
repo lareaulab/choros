@@ -188,7 +188,7 @@ parse_coefs <- function(nb_fit) {
                                             function(x) {
                                               paste0(names(nb_fit$xlevels)[x], nb_fit$xlevels[[x]][1])
                                             }),
-                                estimate=1, std_error=NA, t=NA, p=NA,
+                                estimate=0, std_error=NA, t=NA, p=NA,
                                 row.names=NULL))
   # 3. add annotations for individual terms
   for(tmp_coef in grep(":", regression_terms, invert=T, value=T)) {

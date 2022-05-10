@@ -2,7 +2,7 @@
 ## helper.R:
 export('load_lengths', 'gff_to_lengths', 'load_fasta', 'write_fasta',
        'load_offsets', 'read_fasta_as_codons', 'get_codons', 'get_bias_seq',
-       'convert_to_aa', 'parse_coefs', 'parse_coefs.negbin', 'match_rows')
+       'convert_to_aa', 'parse_coefs', 'match_rows')
 ## prep_data.R:
 export('load_bam', "init_data", 'count_d5_d3', 'count_footprints',
        'calculate_codon_density', 'calculate_transcript_density',
@@ -27,4 +27,3 @@ importFrom('Biostrings', 'DNAStringSet', 'readDNAStringSet',
            'writeXStringSet', 'translate')
 import('patchwork')
 import('RColorBrewer')
-importFrom('glmnet', 'coef.glmnet')

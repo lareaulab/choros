@@ -1,5 +1,6 @@
 load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, offsets_fname,
-                     f5_length=3, f3_length=3, full=F, num_cores=NULL, compute_gc=T) {
+                     f5_length=3, f3_length=3, full=F, num_cores=NULL,
+                     compute_gc=T, gc_omit="APE") {
   # calculate proportion of footprints within each 5' and 3' digest length combination
   ## bam_fname: character; file.path to .bam alignment file
   ## transcript_fa_fname: character; file path to transcriptome .fa file
@@ -9,6 +10,8 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   ## f3_length: integer; length of 3' bias region
   ## full: logical; whether to import all fields in .bam alignment file
   ## num_cores: integer; number of cores to parallelize over
+  ## compute_gc: logical; whether to return RPF %GC
+  ## gc_omit: character; which codon sites to omit, one of c("A", "AP", "APE")
   if(is.null(num_cores)) {
     num_cores <- parallel::detectCores()-8
   }
@@ -79,21 +82,27 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   alignment <- foreach(x=split(alignment, chunks),
                        .combine='rbind', .export=c("get_bias_seq")) %dopar% {
                          within(x, {
-                           genome_f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length)
-                           genome_f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length)
+                           f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length)
+                           f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length)
                          })
                        }
+  # 9. annotate RPF %GC
+  if(compute_gc) {
+    alignment$gc <- compute_rpf_gc(alignment, omit=gc_omit,
+                                   transcript_fa_fname, transcript_length_fname)
+  }
   # return data
-  subset_features <- c("transcript", "cod_idx", "d5", "d3", "genome_f5", "genome_f3", "count")
+  subset_features <- c("transcript", "cod_idx", "d5", "d3", "f5", "f3", "count")
   if(!full) { alignment <- alignment[, subset_features] }
   return(alignment)
 }
 
 init_data <- function(transcript_fa_fname, transcript_length_fname,
                       digest5_lengths=15:18, digest3_lengths=9:11,
-                      d5_d3_subsets=NULL, f5_length=2, f3_length=3,
+                      d5_d3_subsets=NULL, f5_length=3, f3_length=3,
                       num_cores=NULL, which_transcripts=NULL,
-                      exclude_codons5=10, exclude_codons3=10) {
+                      exclude_codons5=10, exclude_codons3=10,
+                      compute_gc=T, gc_omit="APE") {
   # initialize data.frame for downstream GLM
   ## transcript_fa_fname: character; file path to transcriptome .fa file
   ## transcript_length_fname: character; file path to transcriptome lengths file
@@ -105,12 +114,16 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   ## which_transcripts: character vector; transcripts selected for regression
   ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
   ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
+  ## compute_gc: logical; whether to return RPF %GC
+  ## gc_omit: character; which codon sites to omit, one of c("A", "AP", "APE")
+  # 1. load transcript sequence and UTR/CDS lengths
   transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_length <- load_lengths(transcript_length_fname)
   if(!is.null(which_transcripts)) {
     transcript_seq <- transcript_seq[which_transcripts]
     transcript_length <- subset(transcript_length, transcript %in% which_transcripts)
   }
+  # 2. enuemrate transcript + codon indices
   transcript <- unlist(mapply(rep, x=transcript_length$transcript,
                               times=(transcript_length$cds_length/3 -
                                        exclude_codons5 - exclude_codons3)))
@@ -118,6 +131,7 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
                            function(x) {
                              seq(exclude_codons5 + 1, x - exclude_codons3)
                            }))
+  # 3. enumerate A/P/E site codons
   utr5_length <- transcript_length$utr5_length[match(transcript,
                                                      transcript_length$transcript)]
   if(is.null(num_cores)) {
@@ -139,6 +153,7 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
                                                MoreArgs=list(transcript_seq=transcript_seq)))),
                                  row.names=NULL, stringsAsFactors=F)
                     }
+  # 4. enumerate f5 and f3 end sequences
   if(!is.null(d5_d3_subsets)) {
     dat <- reshape::expand.grid.df(data.frame(transcript, cod_idx, codons, utr5_length,
                                               stringsAsFactors=F),
@@ -152,15 +167,19 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   dat <- foreach(x=split(dat, chunks),
                  .combine='rbind', .export=c("get_bias_seq")) %dopar% {
                    within(x, {
-                     genome_f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length)
-                     genome_f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length)
+                     f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length)
+                     f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length)
                    })
                  }
+  # 5. compute %GC
+  dat$gc <- compute_rpf_gc(dat, omit=gc_omit, transcript_fa_fname,
+                           transcript_lengths_fname)
+  # return enumerated footprints
   dat$transcript <- as.factor(dat$transcript)
   dat$d5 <- factor(dat$d5, levels=unique(d5_d3_subsets$d5))
   dat$d3 <- factor(dat$d3, levels=unique(d5_d3_subsets$d3))
-  dat$genome_f5 <- as.factor(dat$genome_f5)
-  dat$genome_f3 <- as.factor(dat$genome_f3)
+  dat$f5 <- as.factor(dat$f5)
+  dat$f3 <- as.factor(dat$f3)
   dat$count <- 0
   return(dat)
 }

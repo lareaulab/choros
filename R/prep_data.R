@@ -173,7 +173,7 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
                  }
   # 5. compute %GC
   dat$gc <- compute_rpf_gc(dat, omit=gc_omit, transcript_fa_fname,
-                           transcript_lengths_fname)
+                           transcript_length_fname)
   # return enumerated footprints
   dat$transcript <- as.factor(dat$transcript)
   dat$d5 <- factor(dat$d5, levels=unique(d5_d3_subsets$d5))

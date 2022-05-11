@@ -66,7 +66,7 @@ evaluate_bias <- function(dat, which_column="count",
                           paste0(rep(c("E", "P", "A"), each=3), 0:2),
                           paste0("p", 1:(3*num_f5_codons)))
   }
-  count_dat <- data.frame(count = cts_by_codon[, which_column], codons,
+  count_dat <- data.frame(count = cts_by_codon$count, codons,
                           stringsAsFactors=F)
   if(metric=="corr") {
     # 4. full model

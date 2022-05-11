@@ -1,5 +1,5 @@
-correct_bias <- function(dat, f5_method=NULL, f3_method=NULL, correct_gc=T,
-                         which_column="count", fit_coefs) {
+correct_bias <- function(dat, fit_coefs, f5_method=NULL, f3_method=NULL,
+                         correct_gc=T, which_column="count") {
   # wrapper function to correct biases
   ## dat: data.frame containing regression predictors
   ## f5_method: character; name of function to apply for 5' correction

@@ -1,5 +1,4 @@
-correct_bias <- function(dat, f5_method="correct_interxn",
-                         f3_method="correct_interxn", correct_gc=T,
+correct_bias <- function(dat, f5_method=NULL, f3_method=NULL, correct_gc=T,
                          which_column="count", fit_coefs) {
   # wrapper function to correct biases
   ## dat: data.frame containing regression predictors
@@ -10,18 +9,23 @@ correct_bias <- function(dat, f5_method="correct_interxn",
   ## fit_coefs: data.frame; output from parse_coefs()
   rpf_count <- sum(dat[, which_column], na.rm=T)
   # 1. correct 5' bias
-  ### TODO check for required arguments for f5_method
+  if(is.null(f5_method)) {
+    f5_method <- ifelse("d5:f5" %in% fit_coefs$group,
+                        "correct_interxn", "correct_marginal")
+  }
   dat$corrected <- do.call(f5_method,
                            args=list(dat=dat, which_column=which_column,
                                      which_region="f5", fit_coefs=fit_coefs))
   # 2. correct 3' bias
-  ### TODO check for required arguments for f3_method
+  if(is.null(f3_method)) {
+    f3_method <- ifelse("d3:f3" %in% fit_coefs$group,
+                        "correct_interxn", "correct_marginal")
+  }
   dat$corrected <- do.call(f3_method,
                            args=list(dat=dat, which_column="corrected",
                                      which_region="f3", fit_coefs=fit_coefs))
   # 3. correct for %GC
   if(correct_gc) {
-    ### TODO check that fit_coefs specified
     dat$corrected <- correct_gc(dat, fit_coefs, which_column="corrected")
   }
   # 4. rescale corrected counts so they sum to original footprint count

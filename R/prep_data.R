@@ -1,21 +1,3 @@
-bam_fname <- "~/footprint-bias/expts/meydan_2020/raw_data/disome/disome_trimUMI_footprints.transcript.bam"
-transcript_fa_fname <- "~/footprint-bias/reference_data/scer.transcripts.20cds20.fa"
-transcript_length_fname <- "~/footprint-bias/reference_data/scer.transcripts.20cds20.lengths.txt"
-offsets_5prime_fname <- "~/footprint-bias/expts/meydan_2020/Asite_rules_disome_5prime.txt"
-offsets_3prime_fname <- "~/footprint-bias/expts/meydan_2020/Asite_rules_disome_3prime.txt"
-f5_length <- 2
-f3_length <-3
-full <- F
-compute_gc <- T
-gc_omit <- "APE"
-num_cores <- NULL
-read_type <- "disome"
-
-tmp <- load_bam(bam_fname, transcript_fa_fname, transcript_length_fname,
-                f5_length=f5_length, f3_length=f3_length, read_type="disome",
-                offsets_5prime_fname=offsets_5prime_fname,
-                offsets_3prime_fname=offsets_3prime_fname)
-
 load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, offsets_fname=NULL,
                      f5_length=3, f3_length=3, full=F, num_cores=NULL,
                      compute_gc=T, gc_omit="APE", read_type="monosome",

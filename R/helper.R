@@ -114,16 +114,29 @@ get_codons <- function(transcript_name, cod_idx, utr5_length, transcript_seq) {
   return(codons)
 }
 
-get_bias_seq <- function(dat, transcript_seq, bias_region, bias_length=3) {
-  # dat: data.frame; contains columns c("transcript", "cod_idx", "d5", "d3", "utr5_length")
+get_bias_seq <- function(dat, transcript_seq, bias_region, bias_length=3,
+                         read_type="monosome") {
+  ## dat: data.frame; contains columns c("transcript", "d5", "d3", "utr5_length")
+  ### - if read_type=="monosome", then A site codon indices are "cod_idx"
+  ### - if read_type=="disome", then A site codon indices are "cod_idx_lagging" and "cod_idx_leading"
   ## transcript_seq: character; output from load_fasta()
   ## bias_region: character vector; one of "f5" or "f3" (corresponding to 5' or 3' bias sequence)
   ## bias_length: integer; length of bias sequence
+  ## read_type: character; one of "monosome" or "disome"
+  ### TODO: check that read_type is valid
   if(bias_region=="f5") {
-    seq_start <- with(dat, utr5_length + 3*(cod_idx-1)+1 - d5)
+    if(read_type=="monosome") {
+      seq_start <- with(dat, utr5_length + 3*(cod_idx-1)+1 - d5)
+    } else {
+      seq_start <- with(dat, utr5_length + 3*(cod_idx_lagging-1)+1 - d5)
+    }
     seq_end <- seq_start + bias_length - 1
   } else {
-    seq_end <- with(dat, utr5_length + 3*cod_idx + d3)
+    if(read_type=="monosome") {
+      seq_end <- with(dat, utr5_length + 3*cod_idx + d3)
+    } else {
+      seq_end <- with(dat, utr5_length + 3*cod_idx_leading + d3)
+    }
     seq_start <- seq_end - bias_length + 1
   }
   bias_seq <- mapply(substr, transcript_seq[as.character(dat$transcript)],
@@ -250,4 +263,68 @@ parse_coefs <- function(nb_fit) {
   fit_coefs$group <- sub("genome_", "", fit_coefs$group)
   fit_coefs$group_1 <- sub("genome_", "", fit_coefs$group_1)
   return(fit_coefs)
+}
+
+compute_rpf_gc <- function(dat, omit="APE", transcript_fa_fname,
+                           transcript_lengths_fname, read_type="monosome") {
+  # compute GC content in RPF, omitting A/P/E sites
+  # dat: data.frame; contains columns c("transcript", "cod_idx", "d5", "d3")
+  ## omit: character; which codon sites to omit, one of c("A", "AP", "APE")
+  ## transcript_fa_fname: character; file path to transcriptome fasta file
+  ## transcript_lengths_fname: character; file path to transcript lengths file
+  ## read_type: character; one of "monosome" or "disome"
+  ### TODO: check whether codon index label matches read_type
+  transcript_seq <- load_fasta(transcript_fa_fname)
+  transcript_lengths <- load_lengths(transcript_lengths_fname)
+  utr5_lengths <- transcript_lengths$utr5_length
+  names(utr5_lengths) <- transcript_lengths$transcript
+  num_omit_codons <- ifelse(grepl("E", omit), 2,
+                            ifelse(grepl("P", omit), 1, 0))
+  dat$transcript <- as.character(dat$transcript)
+  dat$d5 <- as.numeric(as.character(dat$d5))
+  dat$d3 <- as.numeric(as.character(dat$d3))
+  if(read_type=="monosome") {
+    A_start <- utr5_lengths[dat$transcript] + 1 + 3*(dat$cod_idx-1)
+    rpf_length <- with(dat, d5+d3+3)
+    # 1. extract RPF 5' regions
+    rpf_5_start <- A_start - dat$d5
+    rpf_5_end <- A_start - 1 - 3*num_omit_codons
+    rpf_5 <- mapply(substr, transcript_seq[dat$transcript],
+                    rpf_5_start, rpf_5_end)
+    # 2. extract RPF 3' regions
+    rpf_3_start <- A_start + 3
+    rpf_3_end <- A_start + 2 + dat$d3
+    rpf_3 <- mapply(substr, transcript_seq[dat$transcript],
+                    rpf_3_start, rpf_3_end)
+    # 3. concatenate regions
+    rpf_regions <- paste0(rpf_5, rpf_3)
+  } else {
+    A_lagging_start <- utr5_lengths[dat$transcript] + 1 +
+      3*(dat$cod_idx_lagging-1)
+    A_leading_start <- utr5_lengths[dat$transcript] + 1 +
+      3*(dat$cod_idx_leading-1)
+    rpf_length <- with(dat, d5+d3+3*(cod_idx_leading-cod_idx_lagging+1))
+    # 1. extract region 5' of lagging A site
+    rpf_5_start <- A_lagging_start - dat$d5
+    rpf_5_end <- A_lagging_start - 1 - 3*num_omit_codons
+    rpf_5 <- mapply(substr, transcript_seq[dat$transcript],
+                    rpf_5_start, rpf_5_end)
+    # 2. extract region between lagging and leading A sites
+    rpf_inner_start <- A_lagging_start + 3
+    rpf_inner_end <- A_leading_start - 1 - 3*num_omit_codons
+    rpf_inner <- mapply(substr, transcript_seq[dat$transcript],
+                               rpf_inner_start, rpf_inner_end)
+    # 3. extract RPF 3' regions
+    rpf_3_start <- A_leading_start + 3
+    rpf_3_end <- A_leading_start + 2 + dat$d3
+    rpf_3 <- mapply(substr, transcript_seq[dat$transcript],
+                    rpf_3_start, rpf_3_end)
+    # 4. concatenate regions
+    rpf_regions <- paste0(rpf_5, rpf_inner, rpf_3)
+  }
+  # compute GC content
+  gc_content <- strsplit(rpf_regions, split="")
+  gc_content <- sapply(gc_content, function(x) sum(x %in% c("G", "C")))
+  gc_content <- gc_content / rpf_length
+  return(gc_content)
 }

@@ -1,6 +1,25 @@
-load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, offsets_fname,
+bam_fname <- "~/footprint-bias/expts/meydan_2020/raw_data/disome/disome_trimUMI_footprints.transcript.bam"
+transcript_fa_fname <- "~/footprint-bias/reference_data/scer.transcripts.20cds20.fa"
+transcript_length_fname <- "~/footprint-bias/reference_data/scer.transcripts.20cds20.lengths.txt"
+offsets_5prime_fname <- "~/footprint-bias/expts/meydan_2020/Asite_rules_disome_5prime.txt"
+offsets_3prime_fname <- "~/footprint-bias/expts/meydan_2020/Asite_rules_disome_3prime.txt"
+f5_length <- 2
+f3_length <-3
+full <- F
+compute_gc <- T
+gc_omit <- "APE"
+num_cores <- NULL
+read_type <- "disome"
+
+tmp <- load_bam(bam_fname, transcript_fa_fname, transcript_length_fname,
+                f5_length=f5_length, f3_length=f3_length, read_type="disome",
+                offsets_5prime_fname=offsets_5prime_fname,
+                offsets_3prime_fname=offsets_3prime_fname)
+
+load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, offsets_fname=NULL,
                      f5_length=3, f3_length=3, full=F, num_cores=NULL,
-                     compute_gc=T, gc_omit="APE") {
+                     compute_gc=T, gc_omit="APE", read_type="monosome",
+                     offsets_5prime_fname=NULL, offsets_3prime_fname=NULL) {
   # calculate proportion of footprints within each 5' and 3' digest length combination
   ## bam_fname: character; file.path to .bam alignment file
   ## transcript_fa_fname: character; file path to transcriptome .fa file
@@ -12,6 +31,11 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   ## num_cores: integer; number of cores to parallelize over
   ## compute_gc: logical; whether to return RPF %GC
   ## gc_omit: character; which codon sites to omit, one of c("A", "AP", "APE")
+  ## read_type: character; one of "monosome" or "disome"
+  ## offsets_5prime_fname: character; file.path to 5' offset rules for disomes
+  ## offsets_3prime_fname: character; file.path to 3' offset rules for disomes
+  ### TODO: check input parameters
+  ### (need offsets_5prime_fname and offsets_3prime_fname if read_type=="disome)
   if(is.null(num_cores)) {
     num_cores <- parallel::detectCores()-8
   }
@@ -35,67 +59,121 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
               "unaligned RPF counts"))
   alignment <- subset(alignment, !is.na(alignment$rname))
-  # 2. assign 5' UTR lengths
+  # 2. assign 5' UTR and CDS lengths
   transcript_length <- load_lengths(transcript_length_fname)
   alignment$utr5_length <- transcript_length$utr5_length[match(alignment$rname,
                                                                transcript_length$transcript)]
+  alignment$cds_length <- transcript_length$cds_length[match(alignment$rname,
+                                                             transcript_length$transcript)]
   # 3. calculate frame
-  alignment$frame <- (alignment$pos - alignment$utr5_length - 1) %% 3
-  # 4. calculate 5' and 3' digest lengths
-  offsets <- load_offsets(offsets_fname)
+  if(read_type == "monosome") {
+    alignment$frame <- (alignment$pos - alignment$utr5_length - 1) %% 3
+  } else {
+    alignment$frame_5 <- with(alignment, ((pos - 1) - utr5_length) %% 3)
+    alignment$frame_3 <- with(alignment, ((pos + qwidth - 1)-utr5_length) %% 3)
+  }
+  # 4. remove reads outside length definitions
+  offsets <- load_offsets(ifelse(read_type=="monosome",
+                                 offsets_fname,
+                                 offsets_5prime_fname))
   tmp_counts <- sum(subset(alignment, !(qwidth %in% unique(offsets$length)))$tag.ZW, na.rm=T)
   print(paste("... Removing",
               round(tmp_counts, 1),
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
               "RPF counts outside length distribution"))
   alignment <- subset(alignment, qwidth %in% unique(offsets$length))
+  # 5. assign 5' digest lengths
   alignment$d5 <- offsets$offset[match_rows(alignment, offsets,
-                                            c("frame", "qwidth"),
+                                            c(ifelse(read_type=="monosome",
+                                                     "frame", "frame_5"), "qwidth"),
                                             c("frame", "length"))]
   tmp_counts <- sum(subset(alignment, is.na(d5))$tag.ZW)
   print(paste("... Removing",
               round(tmp_counts, 1),
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
-              "footprints outside A site offset definitions"))
+              "footprints outside",
+              ifelse(read_type=="monosome", "A site", "5'"),
+              "offset definitions"))
   alignment <- subset(alignment, !is.na(alignment$d5))
-  # 5. calculate 3' digest lengths
-  alignment$d3 <- with(alignment, qwidth - d5 - 3)
-  # 6. calculate cod_idx, remove footprints mapped outside coding region
-  alignment$cod_idx <- with(alignment, (pos + d5 - utr5_length + 2) / 3)
-  alignment$cds_length <- transcript_length$cds_length[match(alignment$rname,
-                                                             transcript_length$transcript)]/3
-  outside_cds <- ((alignment$cod_idx <= 0) | (alignment$cod_idx > alignment$cds_length))
+  # 6. calculate 3' digest lengths
+  if(read_type=="monosome") {
+    alignment$d3 <- with(alignment, qwidth - d5 - 3)
+  } else {
+    offsets_3prime <- load_offsets(offsets_3prime_fname)
+    alignment$d3 <- offsets_3prime$offset[match_rows(alignment, offsets_3prime,
+                                                     c("frame_3", "qwidth"),
+                                                     c("frame", "length"))]
+    tmp_counts <- sum(subset(alignment, is.na(d3))$tag.ZW)
+    print(paste("... Removing",
+                round(tmp_counts, 1),
+                paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
+                "footprints outside 3' offset definitions"))
+    alignment <- subset(alignment, !is.na(alignment$d3))
+  }
+  # 7. calculate A site codon indices
+  if(read_type=="monosome") {
+    alignment$cod_idx <- with(alignment, (pos + d5 - utr5_length + 2) / 3)
+  } else {
+    alignment$cod_idx_lagging <- with(alignment, (pos + d5 - utr5_length + 2) / 3)
+    alignment$cod_idx_leading <- with(alignment, (((pos + qwidth - 1) - d3) - utr5_length) / 3)
+  }
+  # 7. remove reads with A site codon(s) outside CDS
+  if(read_type=="monosome") {
+    outside_cds <- with(alignment, (cod_idx < 1) | (cod_idx > cds_length/3))
+  } else {
+    outside_cds <- with(alignment,
+                        (cod_idx_lagging < 1) | (cod_idx_lagging > cds_length/3) |
+                          (cod_idx_leading < 1) | (cod_idx_leading > cds_length/3))
+  }
   tmp_counts <- sum(subset(alignment, outside_cds)$tag.ZW, na.rm=T)
   print(paste("... Removing",
               round(tmp_counts, 1),
               paste0("(", round(tmp_counts / num_footprints * 100, 1), "%)"),
               "footprints outside CDS"))
   alignment <- subset(alignment, !outside_cds)
-  # 7. aggregate alignments
-  alignment <- aggregate(tag.ZW ~ rname + utr5_length + cod_idx + d5 + d3,
-                         data=alignment, FUN=sum)
+  # 7. aggregate alignments, remove reads with 0 counts
+  if(read_type=="monosome") {
+    alignment <- aggregate(tag.ZW ~ rname + utr5_length + cod_idx + d5 + d3,
+                           data=alignment, FUN=sum)
+  } else {
+    alignment <- aggregate(tag.ZW ~ rname + utr5_length + cod_idx_lagging + cod_idx_leading + d5 + d3,
+                           data=alignment, FUN=sum)
+  }
   colnames(alignment)[colnames(alignment)=="rname"] <- "transcript"
   colnames(alignment)[colnames(alignment)=="tag.ZW"] <- "count"
+  alignment <- subset(alignment, count > 0)
   # 8. return genome-annotated bias sequences
   chunks <- cut(seq.int(nrow(alignment)), num_cores)
   transcript_seq <- load_fasta(transcript_fa_fname)
-  alignment <- foreach(x=split(alignment, chunks),
-                       .combine='rbind', .export=c("get_bias_seq")) %dopar% {
+  alignment <- foreach(x=split(alignment, chunks),.combine='rbind',
+                       .packages="choros") %dopar% {
                          within(x, {
-                           f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length)
-                           f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length)
+                           f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length, read_type)
+                           f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length, read_type)
                          })
                        }
   # 9. annotate RPF %GC
   if(compute_gc) {
-    alignment$gc <- compute_rpf_gc(alignment, omit=gc_omit,
-                                   transcript_fa_fname, transcript_length_fname)
+    alignment <- foreach(x=split(alignment, chunks), .combine='rbind',
+                         .packages="choros") %dopar% {
+                           within(x,
+                                  gc <- compute_rpf_gc(x, omit=gc_omit,
+                                                       transcript_fa_fname,
+                                                       transcript_length_fname,
+                                                       read_type))
+                         }
   }
   # return data
-  subset_features <- c("transcript", "cod_idx", "d5", "d3", "f5", "f3", "count")
+  if(read_type=="monosome") {
+    subset_features <- c("transcript", "cod_idx", "d5", "d3", "f5", "f3", "count")
+  } else {
+    subset_features <- c("transcript", "cod_idx_lagging", "cod_idx_leading",
+                         "d5", "d3", "f5", "f3", "count")
+  }
   if(!full) { alignment <- alignment[, subset_features] }
   return(alignment)
 }
+
 
 init_data <- function(transcript_fa_fname, transcript_length_fname,
                       digest5_lengths=15:18, digest3_lengths=9:11,
@@ -277,38 +355,4 @@ calculate_transcript_density <- function(bam_dat, transcript_length_fname,
   per_transcript <- sapply(per_transcript, FUN=statistic)
   per_transcript <- sort(per_transcript, decreasing=T)
   return(per_transcript)
-}
-
-compute_rpf_gc <- function(dat, omit="APE",
-                           transcript_fa_fname, transcript_lengths_fname) {
-  # compute GC content in RPF, omitting A/P/E sites
-  # dat: data.frame; contains columns c("transcript", "cod_idx", "d5", "d3")
-  ## omit: character; which codon sites to omit, one of c("A", "AP", "APE")
-  ## transcript_fa_fname: character; file path to transcriptome fasta file
-  ## transcript_lengths_fname: character; file path to transcript lengths file
-  transcript_seq <- load_fasta(transcript_fa_fname)
-  transcript_lengths <- load_lengths(transcript_lengths_fname)
-  utr5_lengths <- transcript_lengths$utr5_length
-  names(utr5_lengths) <- transcript_lengths$transcript
-  A_start <- utr5_lengths[as.character(dat$transcript)] + 1 + 3*(dat$cod_idx-1)
-  num_omit_codons <- ifelse(grepl("E", omit), 2,
-                            ifelse(grepl("P", omit), 1, 0))
-  dat$d5 <- as.numeric(as.character(dat$d5))
-  dat$d3 <- as.numeric(as.character(dat$d3))
-  # 1. extract RPF 5' regions
-  rpf_5_start <- A_start - dat$d5
-  rpf_5_end <- A_start - 1 - 3*num_omit_codons
-  rpf_5 <- mapply(substr, transcript_seq[as.character(dat$transcript)],
-                  rpf_5_start, rpf_5_end)
-  # 2. extract RPF 3' regions
-  rpf_3_start <- A_start + 3
-  rpf_3_end <- A_start + 2 + dat$d3
-  rpf_3 <- mapply(substr, transcript_seq[as.character(dat$transcript)],
-                  rpf_3_start, rpf_3_end)
-  # 3. compute GC content
-  rpf_regions <- paste0(rpf_5, rpf_3)
-  gc_content <- strsplit(rpf_regions, split="")
-  gc_content <- sapply(gc_content, function(x) sum(x %in% c("G", "C")))
-  gc_content <- gc_content / with(dat, d5 + d3 + 3)
-  return(gc_content)
 }

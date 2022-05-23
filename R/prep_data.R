@@ -94,10 +94,10 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   }
   # 7. calculate A site codon indices
   if(read_type=="monosome") {
-    alignment$cod_idx <- with(alignment, (pos + d5 - utr5_length + 2) / 3)
+    alignment$cod_idx <- with(alignment, ((pos-utr5_length) + d5 + 2) / 3)
   } else {
-    alignment$cod_idx_lagging <- with(alignment, (pos + d5 - utr5_length + 2) / 3)
-    alignment$cod_idx_leading <- with(alignment, (((pos + qwidth - 1) - d3) - utr5_length) / 3)
+    alignment$cod_idx_lagging <- with(alignment, ((pos-utr5_length) + d5 + 2) / 3)
+    alignment$cod_idx_leading <- with(alignment, (((pos-utr5_length) + qwidth - 1) - d3) / 3)
   }
   # 7. remove reads with A site codon(s) outside CDS
   if(read_type=="monosome") {
@@ -147,10 +147,10 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   }
   # return data
   if(read_type=="monosome") {
-    subset_features <- c("transcript", "cod_idx", "d5", "d3", "f5", "f3", "count")
+    subset_features <- c("transcript", "cod_idx", "d5", "d3", "f5", "f3", "gc", "count")
   } else {
     subset_features <- c("transcript", "cod_idx_lagging", "cod_idx_leading",
-                         "d5", "d3", "f5", "f3", "count")
+                         "d5", "d3", "f5", "f3", "gc", "count")
   }
   if(!full) { alignment <- alignment[, subset_features] }
   return(alignment)

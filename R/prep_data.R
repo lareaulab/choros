@@ -156,7 +156,6 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   return(alignment)
 }
 
-
 init_data <- function(transcript_fa_fname, transcript_length_fname,
                       digest5_lengths=15:18, digest3_lengths=9:11,
                       d5_d3_subsets=NULL, f5_length=3, f3_length=3,
@@ -261,27 +260,28 @@ count_d5_d3 <- function(bam_dat, plot_title="") {
   return(list(counts=subset_count, plot=subset_count_plot))
 }
 
-count_footprints <- function(bam_dat, regression_data, which_column="count", nt_base=F) {
+count_footprints <- function(bam_dat, regression_data, which_column="count",
+                             features=c("transcript", "cod_idx", "d5", "d3"),
+                             integer_counts=T) {
   # count up footprints by transcript, A site, and digest lengths
   ## bam_dat: data.frame; output from load_bam()
   ## regression_data: data.frame; output from init_data()
   ## which_column: character; name of column containing counts
-  ## nt_base: logical; whether to account for non-templated bases
+  ## features: character vector; terms to match regression_data to bam_dat with
+  ## integer_counts: logical; whether to round counts to integers
   # count up footprints
   bam_dat <- subset(bam_dat, transcript %in% levels(regression_data$transcript))
-  if(nt_base) {
-    features <- c("transcript", "cod_idx", "mod_d5", "d3", "nt_base")
-    bam_dat <- aggregate(formula(paste(which_column, "~ transcript + cod_idx + mod_d5 + d3 + nt_base")),
-                         data=bam_dat, FUN=sum, na.rm=T)
-  } else {
-    features <- c("transcript", "cod_idx", "d5", "d3")
-    bam_dat <- aggregate(formula(paste(which_column, "~ transcript + cod_idx + d5 + d3")),
-                         data=bam_dat, FUN=sum, na.rm=T)
-  }
+  bam_dat <- aggregate(formula(paste(which_column,
+                                     paste(features, collapse=" + "),
+                                     sep=" ~ "),
+                               ),
+                       data=bam_dat, FUN=sum, na.rm=T)
   # add counts to regression data.frame
   counts <- bam_dat[match_rows(regression_data, bam_dat, features), which_column]
   counts[is.na(counts)] <- 0
-  counts <- round(counts, digits=0) # return integer counts for glm.nb()
+  if(integer_counts) {
+    counts <- round(counts, digits=0) # return integer counts for glm.nb()
+  }
   return(counts)
 }
 

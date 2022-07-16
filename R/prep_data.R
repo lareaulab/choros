@@ -1,5 +1,5 @@
 load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, offsets_fname=NULL,
-                     f5_length=3, f3_length=3, full=F, num_cores=NULL,
+                     f5_length=3, f3_length=3, num_cores=NULL,
                      compute_gc=T, gc_omit="APE", read_type="monosome",
                      offsets_5prime_fname=NULL, offsets_3prime_fname=NULL) {
   # calculate proportion of footprints within each 5' and 3' digest length combination
@@ -9,7 +9,6 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   ## offsets_fname: character; file.path to offset / A site assignment rules .txt file
   ## f5_length: integer; length of 5' bias region
   ## f3_length: integer; length of 3' bias region
-  ## full: logical; whether to import all fields in .bam alignment file
   ## num_cores: integer; number of cores to parallelize over
   ## compute_gc: logical; whether to return RPF %GC
   ## gc_omit: character; which codon sites to omit, one of c("A", "AP", "APE")
@@ -24,15 +23,18 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   cl <- parallel::makeCluster(num_cores)
   on.exit(parallel::stopCluster(cl))
   doParallel::registerDoParallel(cl)
-  # 1. read in footprints
+  # 0. detect whether bam alignment file has ZW tag from RSEM
   bam_file <- Rsamtools::BamFile(bam_fname)
-  if(full) {
-    features <- c("qname", "flag", "rname", "pos", "mapq", "cigar", "seq", "qual", "qwidth")
-  } else {
-    features <- c("rname", "pos", "seq", "qwidth")
-  }
-  bam_param <- Rsamtools::ScanBamParam(tag=c("ZW", "MD"), what=features)
+  bam_tags <- system(paste("samtools view", bam_fname, "| cut -f12- | head -n 10"),
+                     intern=T)
+  has_ZW_tag <- any(grepl("ZW:", bam_tags))
+  # 1. read in footprints
+  bam_features <- c("rname", "pos", "qwidth")
+  bam_param <- ifelse(has_ZW_tag,
+                      Rsamtools::ScanBamParam(what=bam_features, tag=c("ZW", "MD")),
+                      Rsamtools::ScanBamParam(what=bam_features, isUnmappedQuery=F))
   alignment <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
+  if(!has_ZW_tag) { alignment$tag.ZW <- 1 }
   num_footprints <- sum(alignment$tag.ZW, na.rm=T)
   print(paste("Read in", round(num_footprints, 1), "total RPF counts"))
   tmp_counts <- sum(subset(alignment, is.na(rname))$tag.ZW, na.rm=T)
@@ -274,8 +276,8 @@ count_footprints <- function(bam_dat, regression_data, which_column="count",
   bam_dat <- aggregate(formula(paste(which_column,
                                      paste(features, collapse=" + "),
                                      sep=" ~ "),
-                               ),
-                       data=bam_dat, FUN=sum, na.rm=T)
+  ),
+  data=bam_dat, FUN=sum, na.rm=T)
   # add counts to regression data.frame
   counts <- bam_dat[match_rows(regression_data, bam_dat, features), which_column]
   counts[is.na(counts)] <- 0

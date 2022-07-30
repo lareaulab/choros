@@ -19,11 +19,10 @@ choros <- function(bam_fname, transcript_fa_fname,
                        d5_d3_plot_title="", diagnostic_plot_title="")
   if(!is.null(extra_args)) {
     extra_args <- default_args
-    else {
-      not_specified <- names(default_args)[!(names(default_args) %in% names(extr_args))]
-      for(x in not_specified) {
-        extra_args[[x]] <- default_args[[x]]
-      }
+  } else {
+    not_specified <- names(default_args)[!(names(default_args) %in% names(extr_args))]
+    for(x in not_specified) {
+      extra_args[[x]] <- default_args[[x]]
     }
   }
   # 1. generate diagnostic plot

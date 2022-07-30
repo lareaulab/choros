@@ -1,28 +1,13 @@
-load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, offsets_fname=NULL,
-                     f5_length=3, f3_length=3, num_cores=NULL,
-                     compute_gc=T, gc_omit="APE", read_type="monosome",
+load_bam <- function(bam_fname, transcript_length_fname, offsets_fname=NULL,
+                     read_type="monosome",
                      offsets_5prime_fname=NULL, offsets_3prime_fname=NULL) {
   # calculate proportion of footprints within each 5' and 3' digest length combination
   ## bam_fname: character; file.path to .bam alignment file
-  ## transcript_fa_fname: character; file path to transcriptome .fa file
   ## transcript_length_fname: character; file path to transcriptome lengths file
   ## offsets_fname: character; file.path to offset / A site assignment rules .txt file
-  ## f5_length: integer; length of 5' bias region
-  ## f3_length: integer; length of 3' bias region
-  ## num_cores: integer; number of cores to parallelize over
-  ## compute_gc: logical; whether to return RPF %GC
-  ## gc_omit: character; which codon sites to omit, one of c("A", "AP", "APE")
   ## read_type: character; one of "monosome" or "disome"
-  ## offsets_5prime_fname: character; file.path to 5' offset rules for disomes
-  ## offsets_3prime_fname: character; file.path to 3' offset rules for disomes
   ### TODO: check input parameters
   ### (need offsets_5prime_fname and offsets_3prime_fname if read_type=="disome)
-  if(is.null(num_cores)) {
-    num_cores <- parallel::detectCores()-8
-  }
-  cl <- parallel::makeCluster(num_cores)
-  on.exit(parallel::stopCluster(cl))
-  doParallel::registerDoParallel(cl)
   # 0. detect whether bam alignment file has ZW tag from RSEM
   bam_file <- Rsamtools::BamFile(bam_fname)
   bam_tags <- system(paste("samtools view", bam_fname, "| cut -f12- | head -n 10"),
@@ -126,27 +111,6 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
   colnames(alignment)[colnames(alignment)=="rname"] <- "transcript"
   colnames(alignment)[colnames(alignment)=="tag.ZW"] <- "count"
   alignment <- subset(alignment, count > 0)
-  # 8. return genome-annotated bias sequences
-  chunks <- cut(seq.int(nrow(alignment)), num_cores)
-  transcript_seq <- load_fasta(transcript_fa_fname)
-  alignment <- foreach(x=split(alignment, chunks),.combine='rbind',
-                       .packages="choros") %dopar% {
-                         within(x, {
-                           f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length, read_type)
-                           f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length, read_type)
-                         })
-                       }
-  # 9. annotate RPF %GC
-  if(compute_gc) {
-    alignment <- foreach(x=split(alignment, chunks), .combine='rbind',
-                         .packages="choros") %dopar% {
-                           within(x,
-                                  gc <- compute_rpf_gc(x, omit=gc_omit,
-                                                       transcript_fa_fname,
-                                                       transcript_length_fname,
-                                                       read_type))
-                         }
-  }
   # return data
   if(read_type=="monosome") {
     subset_features <- c("transcript", "cod_idx", "d5", "d3", "f5", "f3", "gc", "count")
@@ -155,6 +119,69 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname, of
                          "d5", "d3", "f5", "f3", "gc", "count")
   }
   if(!full) { alignment <- alignment[, subset_features] }
+  return(alignment)
+}
+
+annotate_bias_sequences <- function(bam_data, transcript_fa_fname, read_type="monosome",
+                                    f5_length=3, f3_length=3, num_cores=NULL) {
+  # annotate bias sequences
+  ## bam_data: data.frame(); output from load_bam()
+  ## transcript_fa_fname: character; file path to transcriptome .fa file
+  ## read_type: character; one of "monosome" or "disome"
+  ## f5_length: integer; length of 5' bias region
+  ## f3_length: integer; length of 3' bias region
+  ## num_cores: integer; number of cores to parallelize over
+  transcript_seq <- load_fasta(transcript_fa_fname)
+  # 0. initialize parallelization
+  if(is.null(num_cores)) {
+    num_cores <- parallel::detectCores()-8
+  }
+  cl <- parallel::makeCluster(num_cores)
+  on.exit(parallel::stopCluster(cl))
+  doParallel::registerDoParallel(cl)
+  # 1. split data into chunks
+  chunks <- cut(seq.int(nrow(alignment)), num_cores*10)
+  alignment <- split(alignment, chunks)
+  # 2. retrieve bias sequences
+  alignment <- foreach(x=alignment, .combine='rbind',
+                       .packages="choros") %dopar% {
+                         within(x, {
+                           f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length, read_type)
+                           f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length, read_type)
+                         })
+                       }
+  # return data
+  return(alignment)
+}
+
+annotate_gc <- function(bam_data, transcript_fa_fname, transcript_length_fname,
+                        num_cores=NULL) {
+  # annotate bias sequences
+  ## bam_data: data.frame(); output from load_bam()
+  ## transcript_fa_fname: character; file path to transcriptome .fa file
+  ## transcripts_length_fname: character; filepath to transcriptome lengths file
+  # 0. initialize parallelization
+  transcript_seq <- load_fasta(transcript_fa_fname)
+  if(is.null(num_cores)) {
+    num_cores <- parallel::detectCores()-8
+  }
+  cl <- parallel::makeCluster(num_cores)
+  on.exit(parallel::stopCluster(cl))
+  doParallel::registerDoParallel(cl)
+  # 1. split data into chunks
+  chunks <- cut(seq.int(nrow(alignment)), num_cores*10)
+  alignment <- split(alignment, chunks)
+  # 2. calculate %GC
+  alignment <- foreach(x=alignment, .combine='rbind',
+                       .packages="choros") %dopar% {
+                         within(x, {
+                           gc <- compute_rpf_gc(x, omit=gc_omit,
+                                                transcript_fa_fname,
+                                                transcript_length_fname,
+                                                read_type)
+                         })
+                       }
+  # return data
   return(alignment)
 }
 
@@ -262,6 +289,15 @@ count_d5_d3 <- function(bam_dat, plot_title="") {
   return(list(counts=subset_count, plot=subset_count_plot))
 }
 
+choose_subsets <- function(d5_d3, min_prop=0.9) {
+  # pick d5/d3 subsets to that covers (min_prop)% of data
+  ## d5_d3: list; output from count_d5_d3
+  ## min_prop: numeric; minimum proportion of footprint counts to be modeled
+  subset_counts <- d5_d3$counts
+  num_subsets <- which(subset_counts$proportion>min_prop)[1]
+  return(subset_counts[1:num_subsets])
+}
+
 count_footprints <- function(bam_dat, regression_data, which_column="count",
                              features=c("transcript", "cod_idx", "d5", "d3"),
                              integer_counts=T) {
@@ -285,6 +321,20 @@ count_footprints <- function(bam_dat, regression_data, which_column="count",
     counts <- round(counts, digits=0) # return integer counts for glm.nb()
   }
   return(counts)
+}
+
+count_nonzero_codons <- function(bam_dat) {
+  # count the number of nonzero codon positions per transcript
+  ## bam_dat: data.frame; output from load_bam()
+  bam_transcripts <- levels(bam_dat$transcripts)
+  num_nonzero <- sapply(bam_transcripts,
+                        function(x) {
+                          tmp_data <- subset(bam_dat, transcript==x)
+                          codon_cts <- aggregate(count ~ transcript + cod_idx,
+                                                 data=x, FUN=sum)
+                          return(sum(codon_cts$count > 0))
+                        })
+  return(num_nonzero)
 }
 
 calculate_codon_density <- function(bam_dat, transcript_length,

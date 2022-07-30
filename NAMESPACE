@@ -5,7 +5,9 @@ export('load_lengths', 'gff_to_lengths', 'load_fasta', 'write_fasta',
        'convert_to_aa', 'parse_coefs', 'match_rows', 'compute_rpf_gc')
 ## prep_data.R:
 export('load_bam', "init_data", 'count_d5_d3', 'count_footprints',
-       'calculate_codon_density', 'calculate_transcript_density')
+       'calculate_codon_density', 'calculate_transcript_density',
+       "annotate_bias_sequences", "annotate_gc", "choose_subsets",
+       "count_nonzero_codons")
 ## correct_bias.R:
 export('correct_bias', 'correct_interxn', 'correct_fixed',
        'correct_marginal', 'correct_gc')

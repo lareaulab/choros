@@ -15,9 +15,11 @@ load_bam <- function(bam_fname, transcript_length_fname, offsets_fname=NULL,
   has_ZW_tag <- any(grepl("ZW:", bam_tags))
   # 1. read in footprints
   bam_features <- c("rname", "pos", "qwidth")
-  bam_param <- ifelse(has_ZW_tag,
-                      Rsamtools::ScanBamParam(what=bam_features, tag=c("ZW", "MD")),
-                      Rsamtools::ScanBamParam(what=bam_features, isUnmappedQuery=F))
+  if(has_ZW_tag) {
+    bam_param <- Rsamtools::ScanBamParam(what=bam_features, tag=c("ZW", "MD"))
+  } else {
+    Rsamtools::ScanBamParam(what=bam_features, isUnmappedQuery=F)
+  }
   alignment <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
   if(!has_ZW_tag) { alignment$tag.ZW <- 1 }
   num_footprints <- sum(alignment$tag.ZW, na.rm=T)
@@ -211,7 +213,7 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
     transcript_seq <- transcript_seq[which_transcripts]
     transcript_length <- subset(transcript_length, transcript %in% which_transcripts)
   }
-  # 2. enuemrate transcript + codon indices
+  # 2. enumerate transcript + codon indices
   transcript <- unlist(mapply(rep, x=transcript_length$transcript,
                               times=(transcript_length$cds_length/3 -
                                        exclude_codons5 - exclude_codons3)))

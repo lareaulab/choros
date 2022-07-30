@@ -120,7 +120,7 @@ load_bam <- function(bam_fname, transcript_length_fname, offsets_fname=NULL,
     subset_features <- c("transcript", "cod_idx_lagging", "cod_idx_leading",
                          "d5", "d3", "f5", "f3", "gc", "count")
   }
-  if(!full) { alignment <- alignment[, subset_features] }
+  alignment <- alignment[, subset_features]
   return(alignment)
 }
 

@@ -44,7 +44,6 @@ load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
               "unaligned RPF counts"))
   alignment <- subset(alignment, !is.na(alignment$rname))
   # 2. assign 5' UTR and CDS lengths
-  browser()
   alignment$utr5_length <- transcript_length$utr5_length[match(alignment$rname,
                                                                transcript_length$transcript)]
   alignment$cds_length <- transcript_length$cds_length[match(alignment$rname,

@@ -115,10 +115,10 @@ load_bam <- function(bam_fname, transcript_length_fname, offsets_fname=NULL,
   alignment <- subset(alignment, count > 0)
   # return data
   if(read_type=="monosome") {
-    subset_features <- c("transcript", "cod_idx", "d5", "d3", "f5", "f3", "gc", "count")
+    subset_features <- c("transcript", "cod_idx", "d5", "d3", "count")
   } else {
     subset_features <- c("transcript", "cod_idx_lagging", "cod_idx_leading",
-                         "d5", "d3", "f5", "f3", "gc", "count")
+                         "d5", "d3", "count")
   }
   alignment <- alignment[, subset_features]
   return(alignment)

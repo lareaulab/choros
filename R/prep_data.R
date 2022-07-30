@@ -142,18 +142,18 @@ annotate_bias_sequences <- function(bam_data, transcript_fa_fname, read_type="mo
   on.exit(parallel::stopCluster(cl))
   doParallel::registerDoParallel(cl)
   # 1. split data into chunks
-  chunks <- cut(seq.int(nrow(alignment)), num_cores*10)
-  alignment <- split(alignment, chunks)
+  chunks <- cut(seq.int(nrow(bam_data)), num_cores*10)
+  bam_data <- split(bam_data, chunks)
   # 2. retrieve bias sequences
-  alignment <- foreach(x=alignment, .combine='rbind',
-                       .packages="choros") %dopar% {
-                         within(x, {
-                           f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length, read_type)
-                           f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length, read_type)
-                         })
-                       }
+  bam_data <- foreach(x=bam_data, .combine='rbind',
+                      .packages="choros") %dopar% {
+                        within(x, {
+                          f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length, read_type)
+                          f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length, read_type)
+                        })
+                      }
   # return data
-  return(alignment)
+  return(bam_data)
 }
 
 annotate_gc <- function(bam_data, transcript_fa_fname, transcript_length_fname,
@@ -171,20 +171,20 @@ annotate_gc <- function(bam_data, transcript_fa_fname, transcript_length_fname,
   on.exit(parallel::stopCluster(cl))
   doParallel::registerDoParallel(cl)
   # 1. split data into chunks
-  chunks <- cut(seq.int(nrow(alignment)), num_cores*10)
-  alignment <- split(alignment, chunks)
+  chunks <- cut(seq.int(nrow(bam_data)), num_cores*10)
+  bam_data <- split(bam_data, chunks)
   # 2. calculate %GC
-  alignment <- foreach(x=alignment, .combine='rbind',
-                       .packages="choros") %dopar% {
-                         within(x, {
-                           gc <- compute_rpf_gc(x, omit=gc_omit,
-                                                transcript_fa_fname,
-                                                transcript_length_fname,
-                                                read_type)
-                         })
-                       }
+  bam_data <- foreach(x=bam_data, .combine='rbind',
+                      .packages="choros") %dopar% {
+                        within(x, {
+                          gc <- compute_rpf_gc(x, omit=gc_omit,
+                                               transcript_fa_fname,
+                                               transcript_length_fname,
+                                               read_type)
+                        })
+                      }
   # return data
-  return(alignment)
+  return(bam_data)
 }
 
 init_data <- function(transcript_fa_fname, transcript_length_fname,

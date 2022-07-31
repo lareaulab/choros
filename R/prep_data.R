@@ -291,14 +291,9 @@ count_footprints <- function(bam_dat, regression_data, which_column="count",
 count_nonzero_codons <- function(bam_dat) {
   # count the number of nonzero codon positions per transcript
   ## bam_dat: data.frame; output from load_bam()
-  bam_transcripts <- levels(bam_dat$transcript)
-  num_nonzero <- sapply(bam_transcripts,
-                        function(x) {
-                          tmp_data <- subset(bam_dat, transcript==x)
-                          codon_cts <- aggregate(count ~ transcript + cod_idx,
-                                                 data=tmp_data, FUN=sum)
-                          return(sum(codon_cts$count > 0))
-                        })
+  codon_cts <- aggregate(count ~ transcript + cod_idx, bam_dat, FUN=sum)
+  codon_cts <- split(codon_cts, codon_cts$transcript)
+  num_nonzero <- sapply(codon_cts, function(x) sum(x$count > 0))
   return(num_nonzero)
 }
 

@@ -1,5 +1,5 @@
 load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
-                     offsets_fname=NULL, num_cores=NULL,
+                     offsets_fname=NULL, num_cores=NULL, gc_omit="APE",
                      read_type="monosome", f5_length=3, f3_length=3,
                      offsets_5prime_fname=NULL, offsets_3prime_fname=NULL) {
   # calculate proportion of footprints within each 5' and 3' digest length combination
@@ -125,15 +125,10 @@ load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
   colnames(alignment)[colnames(alignment)=="rname"] <- "transcript"
   alignment <- subset(alignment, count > 0)
   # 8. annotate bias sequences
-  chunks <- cut(seq.int(nrow(alignment)), num_cores*10)
-  alignment <- foreach(x=alignment, .combine='rbind',
-                       .packages="choros") %dopar% {
-                         within(x, {
-                           f5 <- get_bias_seq(x, transcript_seq, "f5", f5_length, read_type)
-                           f3 <- get_bias_seq(x, transcript_seq, "f3", f3_length, read_type)
-                         })
-                       }
+  alignment$f5 <- get_bias_seq(alignment, transcript_seq, "f5", f5_length, read_type)
+  alignment$f3 <- get_bias_seq(alignment, transcript_seq, "f3", f3_length, read_type)
   # 9. annotate gc content
+  chunks <- cut(seq.int(nrow(alignment)), num_cores*10)
   alignment <- foreach(x=alignment, .combine='rbind',
                        .packages="choros") %dopar% {
                          within(x, {

@@ -34,7 +34,6 @@ load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
     Rsamtools::ScanBamParam(what=bam_features, isUnmappedQuery=F)
   }
   alignment <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
-  alignment <- data.table(alignment)
   if(!has_ZW_tag) { alignment$tag.ZW <- 1 }
   num_footprints <- sum(alignment$tag.ZW, na.rm=T)
   print(paste("Read in", round(num_footprints, 1), "total RPF counts"))
@@ -116,6 +115,7 @@ load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
               "footprints outside CDS"))
   alignment <- subset(alignment, !outside_cds)
   # 7. aggregate alignments, remove reads with 0 counts
+  alignment <- data.table(alignment)
   if(read_type=="monosome") {
     aggregate_by <- 'rname,utr5_length,cod_idx,d5,d3'
   } else {

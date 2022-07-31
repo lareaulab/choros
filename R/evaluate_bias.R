@@ -22,7 +22,7 @@ evaluate_bias <- function(dat, which_column="count",
   codon_cts <- aggregate(formula(paste(which_column, "~ transcript + cod_idx")),
                          data=dat, FUN=sum, na.rm=T)
   # remove truncated positions, flesh out unobserved positions
-  transcripts <- levels(dat$transcript)
+  transcripts <- levels(droplevels(dat$transcript))
   cts_by_codon <- lapply(transcripts,
                          function(x) {
                            num_codons <- transcripts_lengths$num_codons[transcripts_lengths$transcript==x]
@@ -33,8 +33,7 @@ evaluate_bias <- function(dat, which_column="count",
   cts_by_codon$count <- codon_cts[[which_column]][match_rows(cts_by_codon, codon_cts)]
   cts_by_codon$count[is.na(cts_by_codon$count)] <- 0
   # 2. scale footprint counts by transcript mean
-  cts_by_codon <- split(cts_by_codon, cts_by_codon$transcript)
-  cts_by_codon <- lapply(cts_by_codon,
+  cts_by_codon <- lapply(split(cts_by_codon, cts_by_codon$transcript),
                          function(x) {
                            if(sum(x$count) == 0) {
                              print("ERROR: no footprints observed!")

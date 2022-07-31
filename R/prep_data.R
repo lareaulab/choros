@@ -33,7 +33,7 @@ load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
   } else {
     Rsamtools::ScanBamParam(what=bam_features, isUnmappedQuery=F)
   }
-  alignment <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
+  alignment <- data.table(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
   if(!has_ZW_tag) { alignment$tag.ZW <- 1 }
   num_footprints <- sum(alignment$tag.ZW, na.rm=T)
   print(paste("Read in", round(num_footprints, 1), "total RPF counts"))
@@ -115,7 +115,6 @@ load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
               "footprints outside CDS"))
   alignment <- subset(alignment, !outside_cds)
   # 7. aggregate alignments, remove reads with 0 counts
-  alignment <- data.table::data.table(alignment)
   if(read_type=="monosome") {
     aggregate_by <- 'rname,utr5_length,cod_idx,d5,d3'
   } else {
@@ -129,7 +128,7 @@ load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
   alignment$f3 <- get_bias_seq(alignment, transcript_seq, "f3", f3_length, read_type)
   # 9. annotate gc content
   chunks <- cut(seq.int(nrow(alignment)), num_cores*10)
-  alignment <- foreach(x=alignment, .combine='rbind',
+  alignment <- foreach(x=split(alignment, chunks), .combine='rbind',
                        .packages="choros") %dopar% {
                          within(x, {
                            gc <- compute_rpf_gc(x, omit=gc_omit,

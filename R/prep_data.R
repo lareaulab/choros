@@ -1,4 +1,4 @@
-load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
+load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname,
                      offsets_fname=NULL, num_cores=NULL, gc_omit="APE",
                      read_type="monosome", f5_length=3, f3_length=3,
                      offsets_5prime_fname=NULL, offsets_3prime_fname=NULL) {

@@ -296,7 +296,7 @@ count_nonzero_codons <- function(bam_dat) {
                         function(x) {
                           tmp_data <- subset(bam_dat, transcript==x)
                           codon_cts <- aggregate(count ~ transcript + cod_idx,
-                                                 data=x, FUN=sum)
+                                                 data=tmp_data, FUN=sum)
                           return(sum(codon_cts$count > 0))
                         })
   return(num_nonzero)

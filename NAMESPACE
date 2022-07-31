@@ -28,3 +28,4 @@ importFrom('Biostrings', 'DNAStringSet', 'readDNAStringSet',
            'writeXStringSet', 'translate')
 import('patchwork')
 import('RColorBrewer')
+import('data.table')

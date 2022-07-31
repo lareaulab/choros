@@ -115,15 +115,14 @@ load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
               "footprints outside CDS"))
   alignment <- subset(alignment, !outside_cds)
   # 7. aggregate alignments, remove reads with 0 counts
+  alignment <- data.table::data.table(alignment)
   if(read_type=="monosome") {
-    alignment <- aggregate(tag.ZW ~ rname + utr5_length + cod_idx + d5 + d3,
-                           data=alignment, FUN=sum)
+    aggregate_by <- 'rname,utr5_length,cod_idx,d5,d3'
   } else {
-    alignment <- aggregate(tag.ZW ~ rname + utr5_length + cod_idx_lagging + cod_idx_leading + d5 + d3,
-                           data=alignment, FUN=sum)
+    aggregate_by <- "rname,utr5_length,cod_idx_lagging,cod_idx_leading,d5_d3"
   }
+  alignment <- alignment[, list(count=sum(tag.ZW)), by=aggregate_by]
   colnames(alignment)[colnames(alignment)=="rname"] <- "transcript"
-  colnames(alignment)[colnames(alignment)=="tag.ZW"] <- "count"
   alignment <- subset(alignment, count > 0)
   # 8. annotate bias sequences
   chunks <- cut(seq.int(nrow(alignment)), num_cores*10)

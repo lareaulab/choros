@@ -33,7 +33,8 @@ load_bam <- function(bam_fname, transcript_seq_fname, transcript_length_fname,
   } else {
     Rsamtools::ScanBamParam(what=bam_features, isUnmappedQuery=F)
   }
-  alignment <- data.table(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
+  alignment <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
+  alignment <- data.table(alignment)
   if(!has_ZW_tag) { alignment$tag.ZW <- 1 }
   num_footprints <- sum(alignment$tag.ZW, na.rm=T)
   print(paste("Read in", round(num_footprints, 1), "total RPF counts"))

@@ -260,7 +260,7 @@ choose_subsets <- function(d5_d3, min_prop=0.9) {
   ## min_prop: numeric; minimum proportion of footprint counts to be modeled
   subset_counts <- d5_d3$counts
   num_subsets <- which(subset_counts$proportion>min_prop)[1]
-  return(subset_counts[1:num_subsets])
+  return(subset_counts[1:num_subsets,])
 }
 
 count_footprints <- function(bam_dat, regression_data, which_column="count",

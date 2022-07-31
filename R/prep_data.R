@@ -123,6 +123,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname,
   }
   alignment <- alignment[, list(count=sum(tag.ZW)), by=aggregate_by]
   colnames(alignment)[colnames(alignment)=="rname"] <- "transcript"
+  alignment <- as.data.frame(alignment)
   alignment <- subset(alignment, count > 0)
   # 8. annotate bias sequences
   alignment$f5 <- get_bias_seq(alignment, transcript_seq, "f5", f5_length, read_type)

@@ -23,7 +23,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname,
   doParallel::registerDoParallel(cl)
   # 0. detect whether bam alignment file has ZW tag from RSEM
   bam_file <- Rsamtools::BamFile(bam_fname)
-  bam_tags <- system(paste("samtools view", bam_fname, "| cut -f12- | head -n 10"),
+  bam_tags <- system(paste("samtools view", bam_fname, "| cut -f12- | head -n 100"),
                      intern=T)
   has_ZW_tag <- any(grepl("ZW:", bam_tags))
   # 1. read in footprints

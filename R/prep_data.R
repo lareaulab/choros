@@ -119,7 +119,7 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname,
   if(read_type=="monosome") {
     aggregate_by <- 'rname,utr5_length,cod_idx,d5,d3'
   } else {
-    aggregate_by <- "rname,utr5_length,cod_idx_lagging,cod_idx_leading,d5_d3"
+    aggregate_by <- "rname,utr5_length,cod_idx_lagging,cod_idx_leading,d5,d3"
   }
   alignment <- alignment[, list(count=sum(tag.ZW)), by=aggregate_by]
   colnames(alignment)[colnames(alignment)=="rname"] <- "transcript"
@@ -177,6 +177,9 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
     transcript_length <- subset(transcript_length, transcript %in% which_transcripts)
   }
   # 2. enumerate transcript + codon indices
+  ### TODO: add check for sufficient transcript length
+  transcript_length$num_codons <- with(transcript_length,
+                                       cds_length/3 - exclude_codons5 - exclude_codons3)
   transcript <- unlist(mapply(rep, x=transcript_length$transcript,
                               times=(transcript_length$cds_length/3 -
                                        exclude_codons5 - exclude_codons3)))

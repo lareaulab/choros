@@ -9,11 +9,12 @@ Authors@R: c(person("Amanda", "Mok", role=c("aut", "cre"),
 Author: Amanda Mok [aut, cre],
     Liana Lareau [aut]
 Maintainer: Amanda Mok <a.mok@berkeley.edu>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Description: choros is a pipeline for correcting sequence biases in ribosome 
+    profiling datasets. 
 License: TBD
 Encoding: UTF-8
 LazyData: true
 Depends: parallel, doParallel, foreach, reshape, Rsamtools, 
     ggplot2, MASS, knitr, rmarkdown, Biostrings
 VignetteBuilder: knitr, rmarkdown
+RoxygenNote: 7.2.3

@@ -1,18 +1,29 @@
+#' Pre-process RPF alignment file
+#' 
+#' @description 
+#' This function takes a .bam alignment file where each row corresponds to 
+#' an individual RPF read; generates annotations for RPF codon index, 5' 
+#' digest length, 3' digest length, A-/P-/E-site codons, GC content, and bias 
+#' sequences; filters out invalid RPFs; and aggregates identical RPFs.
+#' 
+#' If `read_type` is `disome`, user must also specify `offsets_5prime_fname` 
+#' and `offsets_3prime_fname`.
+#' 
+#' @param bam_fname character; file path to .bam alignment file
+#' @param transcript_fa_fname character; file path to transcriptome .fasta file
+#' @param transcript_length_fname character; file path to transcriptome lengths file
+#' @param offsets_fname character; file path to A-site assignment rules file
+#' @param read_type character; one of `monosome` or `disome`
+#' @param f5_length integer; length of sequence between RPF 5' end and A site
+#' @param f3_length integer; length of sequence between A site and RPF 3' end
+#' @param num_cores integer; number of cores to use for parallelization
+#' 
+#' @returns A data frame of aggregated RPF counts and annotations
 load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname,
                      offsets_fname=NULL, num_cores=NULL, gc_omit="APE",
                      read_type="monosome", f5_length=3, f3_length=3,
                      offsets_5prime_fname=NULL, offsets_3prime_fname=NULL) {
-  # calculate proportion of footprints within each 5' and 3' digest length combination
-  ## bam_fname: character; file.path to .bam alignment file
-  ## transcript_fa_fname: character; file path to transcriptome .fa file
-  ## transcript_length_fname: character; file path to transcriptome lengths file
-  ## offsets_fname: character; file.path to offset / A site assignment rules .txt file
-  ## read_type: character; one of "monosome" or "disome"
-  ## f5_length: integer; length of 5' bias region
-  ## f3_length: integer; length of 3' bias region
-  ## num_cores: integer; number of cores to parallelize over
   ### TODO: check input parameters
-  ### (need offsets_5prime_fname and offsets_3prime_fname if read_type=="disome)
   transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_length <- load_lengths(transcript_length_fname)
   if(is.null(num_cores)) {
@@ -150,25 +161,33 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname,
   return(alignment)
 }
 
+#' Generate data frame to fit negative binomial regression model
+#' 
+#' @description 
+#' This function enumerates data points to train a regression model of RPF counts,
+#' given a list of transcripts for training
+#' 
+#' @param transcript_fa_fname character; file path to transcriptome .fasta file
+#' @param transcript_length_fname character; file path to transcriptome lengths file
+#' @param digest5_lengths integer vector; legal 5' digest lengths
+#' @param digest3_lengths integer vector; legal 3' digest lengths
+#' @param d5_d3_subsets data frame; columns of `d5` and `d3` to initiate data over
+#' @param f5_length integer; length of 5' bias sequence
+#' @param f3_length integer; length of 3' bias sequence
+#' @param num_cores integer; number of cores to use for parallelization
+#' @param which_transcripts character vector; transcripts selected for regression
+#' @param exclude_codons5 integer; number of codons to exclude from 5' end of transcript
+#' @param exclude_codons3 integer; number of codons to exclude from 3' end of transcript
+#' @param compute_gc logical; whether to return RPF GC-content
+#' @param gc_omit character; one of `A`, `AP`, or `APE` codons to omit for GC-content calculation
+#' 
+#' @returns data frame of data to use for downstream regression modeling
 init_data <- function(transcript_fa_fname, transcript_length_fname,
                       digest5_lengths=15:18, digest3_lengths=9:11,
                       d5_d3_subsets=NULL, f5_length=3, f3_length=3,
                       num_cores=NULL, which_transcripts=NULL,
                       exclude_codons5=10, exclude_codons3=10,
                       compute_gc=T, gc_omit="APE") {
-  # initialize data.frame for downstream GLM
-  ## transcript_fa_fname: character; file path to transcriptome .fa file
-  ## transcript_length_fname: character; file path to transcriptome lengths file
-  ## digest5_lengths: integer vector; legal 5' digest lengths
-  ## digest3_lengths: integer vector; legal 3' digest lengths
-  ## d5_d3_subsets: data.frame; columns "d5" and "d3" of d5/d3 subsets to initiate data over
-  ## bias_length: integer; length of bias sequence
-  ## num_cores: integer; number of cores to parallelize over
-  ## which_transcripts: character vector; transcripts selected for regression
-  ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
-  ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
-  ## compute_gc: logical; whether to return RPF %GC
-  ## gc_omit: character; which codon sites to omit, one of c("A", "AP", "APE")
   # 1. load transcript sequence and UTR/CDS lengths
   transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_length <- load_lengths(transcript_length_fname)
@@ -240,10 +259,17 @@ init_data <- function(transcript_fa_fname, transcript_length_fname,
   return(dat)
 }
 
+#' Count RPFs by 5' and 3' digest lengths
+#' 
+#' @description 
+#' Count number of RPFs per combination of 5' and 3' digest lengths
+#' 
+#' @param bam_dat data frame; output from `load_bam`
+#' @param plot_title character; title for heatmap plot
+#' 
+#' @returns A list containing a data frame of RPF counts by 5' and 3' digest
+#' lengths, and ggplot heatmap of RPF counts
 count_d5_d3 <- function(bam_dat, plot_title="") {
-  # count number of footprints per d5/d3 combination
-  ## bam_dat: data.frame; output from load_bam()
-  ## plot_title: character; plot title for output heatmap
   subset_count <- aggregate(count ~ d5 + d3, data=bam_dat, FUN=sum)
   subset_count <- subset_count[order(subset_count$count, decreasing=T),]
   subset_count$proportion <- sapply(seq(nrow(subset_count)),
@@ -257,24 +283,39 @@ count_d5_d3 <- function(bam_dat, plot_title="") {
   return(list(counts=subset_count, plot=subset_count_plot))
 }
 
+#' Choose RPF lengths and frames to model
+#' 
+#' @description 
+#' This function chooses the most populous RPF 5' and 3' length combinations
+#' to model some minimum proportion of RPF counts.
+#' 
+#' @param d5_d3 list; output from `count_d5_d3`
+#' @param min_prop numeric; minimum proportion of RPF counts to be modeled
+#' 
+#' @returns A data frame of 5' and 3' digest lengths to be used for modeling
+#' RPF counts.
 choose_subsets <- function(d5_d3, min_prop=0.9) {
-  # pick d5/d3 subsets to that covers (min_prop)% of data
-  ## d5_d3: list; output from count_d5_d3
-  ## min_prop: numeric; minimum proportion of footprint counts to be modeled
   subset_counts <- d5_d3$counts
   num_subsets <- which(subset_counts$proportion>min_prop)[1]
   return(subset_counts[1:num_subsets,])
 }
 
+#' Count RPFs by position, frame, and length
+#' 
+#' @description 
+#' This function aggregates RPF counts for a given transcript, codon position, 
+#' and 5' and 3' digest lengths (which correspond to an RPF length and frame).
+#' 
+#' @param bam_dat data frame; output from `load_bam`
+#' @param regression_data data frame; output from `init_data`
+#' @param which_column character; name of column containing counts in `bam_dat`
+#' @param features character vector; terms to match between `regression_data` and `bam_dat`
+#' @param integer_counts logical; whether to round counts to integers
+#' 
+#' @returns A numeric vector of RPF counts corresponding to rows in `regression_data`
 count_footprints <- function(bam_dat, regression_data, which_column="count",
                              features=c("transcript", "cod_idx", "d5", "d3"),
                              integer_counts=T) {
-  # count up footprints by transcript, A site, and digest lengths
-  ## bam_dat: data.frame; output from load_bam()
-  ## regression_data: data.frame; output from init_data()
-  ## which_column: character; name of column containing counts
-  ## features: character vector; terms to match regression_data to bam_dat with
-  ## integer_counts: logical; whether to round counts to integers
   # count up footprints
   bam_dat <- subset(bam_dat, transcript %in% levels(regression_data$transcript))
   bam_dat <- aggregate(formula(paste(which_column,
@@ -291,24 +332,38 @@ count_footprints <- function(bam_dat, regression_data, which_column="count",
   return(counts)
 }
 
+#' Count nonzero codon positions per transcript
+#' 
+#' @description 
+#' This function retruns the number of codon positions within a transcript with
+#' non-zero RPF counts.
+#' 
+#' @param bam_dat data frame; output from `load_bam`
+#' 
+#' @returns A named numeric vector
 count_nonzero_codons <- function(bam_dat) {
-  # count the number of nonzero codon positions per transcript
-  ## bam_dat: data.frame; output from load_bam()
   codon_cts <- aggregate(count ~ transcript + cod_idx, bam_dat, FUN=sum)
   codon_cts <- split(codon_cts, codon_cts$transcript)
   num_nonzero <- sapply(codon_cts, function(x) sum(x$count > 0))
   return(num_nonzero)
 }
 
+#' Calculate codon density
+#' 
+#' @description 
+#' This function returns a vector of RPF counts per codon for an individual transcrips.
+#' 
+#' @param bam_dat data frame; output from `load_bam`
+#' @param transcript_length integer; length of transcript CDS in codons
+#' @param exclude_codons5 integer; number of codons to exclude from 5' end of transcript
+#' @param exclude_codons3 integer; number of codons to exclude from 3' end of transcript
+#' @param normalize logical; whether to normalize codon counts by the average RPF count across the transcript
+#' @param which_column character; column in `bam_dat` corresponding to RPF count
+#' 
+#' @returns A numeric vector of RPF counts per codon position
 calculate_codon_density <- function(bam_dat, transcript_length,
                                     exclude_codons5=10, exclude_codons3=10,
                                     normalize=F, which_column="count") {
-  # return vector of counts per codon (for individual transcript)
-  ## bam_dat: data.frame; output (or subset of) from load_bam()
-  ## transcript_length: integer; number of codons in transcript
-  ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
-  ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
-  ## normalize: logical; whether to normalize codon counts by average across transcript
   # 1. initialize empty vector
   counts <- rep(0, transcript_length)
   names(counts) <- seq(transcript_length)
@@ -325,15 +380,22 @@ calculate_codon_density <- function(bam_dat, transcript_length,
   return(counts)
 }
 
+#' Calculate per-transcript RPF density
+#' 
+#' @description 
+#' This function computes the mean or median footprint density per codon across
+#' all transcripts.
+#' 
+#' @param bam_dat data frame; output from `load_bam`
+#' @param transcript_length_fname character; file path to transcriptome lengths file
+#' @param statistic character; one of `mean` or `median`
+#' @param exclude_codons5 integer; number of codons to exclude from 5' end of transcript
+#' @param exclude_codons3 integer; number of codons to exclude from 3' end of transcript
+#' 
+#' @returns A numeric vector of RPF density per transcript
 calculate_transcript_density <- function(bam_dat, transcript_length_fname,
                                          statistic=mean,
                                          exclude_codons5=10, exclude_codons3=10) {
-  # compute mean/median footprint density per codon across transcript
-  ## bam_dat: data.frame; output from load_bam()
-  ## transcript_length_fname: character; file.path to transcriptome lengths file
-  ## statistic: character; function name (ex. "mean", "median")
-  ## exclude_codons5: integer; number of codons to exclude from 5' end of transcript
-  ## exclude_codons3: integer; number of codons to exclude from 3' end of transcript
   transcript_lengths <- load_lengths(transcript_length_fname)
   # 1. subset by transcript
   bam_dat$transcript <- droplevels(bam_dat$transcript)

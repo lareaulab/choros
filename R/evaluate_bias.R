@@ -1,20 +1,28 @@
+#' Evaluate positional contributions to RPF counts
+#' 
+#' @description 
+#' This function will perform a series of leave-one-out regressions to evaluate
+#' the contribution of individual positions to overall RPF count.
+#' 
+#' @param dat data frame containing regression predictors and column of RPF counts
+#' @param which_column character; name of column containing counts
+#' @param transcripts_fa_fname character; file path to transcriptome .fasta file
+#' @param transcripts_length_fname character; file path to transcriptome lengths file
+#' @param trunc5 integer; number of codons (starting at start codon) to omit in codon correlation regression
+#' @param trunc3 integer; number of codons (starting at stop codon) to omit in codon correlation regression
+#' @param num_f5_codons integer; number of codons 5' of A site to include in regression
+#' @param num_f3_codons integer; number of codons 3' of A site to include in regression
+#' @param type character; one of `codon` or `nt`
+#' @param metric character; one of `corr` or `norm`
+#' 
+#' @returns A named numeric vector of positional contributions to RPF count. 
+#' Values will correspond to either the decrease in correlation between predicted 
+#' and true RPF counts in the leave-one-out model (as computed in the `iXnos` model),
+#' or the norm of regression coefficients at that position.
 evaluate_bias <- function(dat, which_column="count",
                           transcripts_fa_fname, transcripts_length_fname,
                           trunc5=20, trunc3=20, num_f5_codons=6, num_f3_codons=6,
                           type="codon", metric="corr") {
-  # perform iXnos regression and generate leave-one-out correlation plots
-  ## dat: data.frame containing regression predictors and column of corrected counts
-  ## which_column: character; name of column containing counts
-  ## transcripts_fa_fname: character; filepath to transcriptome .fa file
-  ## transcripts_length_fname: character; filepath to transcriptome lengths file
-  ## trunc5: integer; number of 5' codons to leave out in codon correlation regression
-  ## trunc3: integer; number of 3' codons to leave out in codon correlation regression
-  ## num_f5_codons: integer; number of codons to include 5' of A site in regression
-  ## num_f3_codons: integer; number of codons to include 3' of A site in regression
-  ## type: character; one of "codon" or "nt"
-  ## metric: character; one of:
-  ##### corr: delta correlation between full model and leave-one-out model
-  ##### norm: norm of regression coefficients at that position
   transcripts_seq <- read_fasta_as_codons(transcripts_fa_fname, transcripts_length_fname)
   transcripts_lengths <- load_lengths(transcripts_length_fname)
   transcripts_lengths$num_codons <- with(transcripts_lengths, cds_length/3)

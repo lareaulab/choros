@@ -1,15 +1,29 @@
+#' Pipeline for RPF bias correction
+#' 
+#' @description 
+#' This is a wrapper function to perform all the steps in the `choros` pipeline: 
+#' pre-processing of the RPF alignments, deciding which RPF lengths and frames
+#' to model, deciding which transcripts to use for training, regression 
+#' modeling, correction of RPF counts, and evaluation of position-based
+#' biases before/after correction.
+#' 
+#' @param bam_fname character; file path to .bam alignment file
+#' @param transcript_fa_fname character; file path to transcriptome .fasta file
+#' @param transcript_length_fname character; file path to transcriptome lengths file
+#' @param offsets_fname character; file path to offset / A site assignment rules .txt file
+#' @param expt_dir character; file path to directory to save output/intermediate files
+#' @param save_intermediate logical; whether to save intermediate files (if FALSE, 
+#' only save alignment file with corrected weights)
+#' @param extra_args named list; additional parameters to pass onto internal functions
+#' 
+#' @returns A list containing: data frame of all RPF alignments with bias-
+#' corrected counts; data frame used for training the regression model; 
+#' regression coefficients from the model fit; and a list of generated plots
+#' (diagnostic plot of RPF lengths and frames; bias evaluation per-codon and 
+#' per-nucleotide position before and after bias correction)
 choros <- function(bam_fname, transcript_fa_fname,
                    transcript_length_fname, offsets_fname,
                    expt_dir=".", save_intermediate=T, extra_args=NULL) {
-  # wrapper function to run choros pipeline
-  ## bam_fname: character; file.path to .bam alignment file
-  ## transcript_fa_fname: character; file path to transcriptome .fa file
-  ## transcript_length_fname: character; file path to transcriptome lengths file
-  ## offsets_fname: character; file.path to offset / A site assignment rules .txt file
-  ## expt_dir: character; file.path to directory to save output/intermediate files
-  ## save_intermediate: logical; whether to save intermediate files
-  ## extra_args : named list; additional parameters to pass onto internal functions
-  ### if False: only save bam file with corrected weights
   ## TODO: test for appropriate inputs
   ## TODO: flesh out function default settings
   ## 0. parse extra_args
@@ -65,10 +79,6 @@ choros <- function(bam_fname, transcript_fa_fname,
                              f3_length=f3_length, which_transcripts=training_set)
   training_data$transcript <- relevel(training_data$transcript, ref=training_set[1])
   training_data$count <- count_footprints(alignment_data, training_data, "count")
-  if(save_intermediate) {
-    save(training_data, file=file.path(expt_dir,
-                                       paste0(expt_name, "_training.Rda")))
-  }
   # 5. compute regression
   # TODO: output warning if outlier regression values (outside -5:5 ?)
   print("Computing regression fit")
@@ -111,9 +121,9 @@ choros <- function(bam_fname, transcript_fa_fname,
                     codon_corrected = codon_corr_corrected_plot,
                     nt_raw = nt_corr_raw_plot,
                     nt_corrected = nt_corr_corrected_plot)
+  save(alignment_data,
+       file=file.path(expt_dir, paste0(expt_name, "_alignments.Rda")))
   if(save_intermediate) {
-    save(alignment_data,
-         file=file.path(expt_dir, paste0(expt_name, "_alignments.Rda")))
     save(training_data,
          file=file.path(expt_dir, paste0(expt_name, "_training.Rda")))
     save(regression_coefs,

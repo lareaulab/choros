@@ -1,18 +1,28 @@
+#' Generate diagnostic plots
+#' 
+#' @description 
+#' This function generates diagnostic plots: RPF density at the start
+#' codon; RPF density at the stop codon; histogram of RPF lengths; heatmap of 
+#' RPF counts by RPF length and frame
+#' 
+#' Input `.bam` file must contain `tag.ZW` of posterior weights computed from
+#' `RSEM`
+#' 
+#' @param bam_fname character; file path to .bam alignment file
+#' @param transcript_length_fname character; file path to transcriptome lengths file
+#' @param plot_title character; title for diagnostic plot
+#' @param start_min integer; 5'-most position to include in plot, relative to start codon
+#' @param start_max integer; 3'-most position to include in plot, relative to start codon
+#' @param stop_min integer; 5'-most position to include in plot, relative to stop codon
+#' @param stop_max integer; 3'-most position to include in plot, relative to stop codon
+#' @param length_min integer; minimum RPF length
+#' @param length_max integer; maximum RPF length
+#' 
+#' @returns A patchwork object of diagnostic plots
 plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
                             start_min=-20, start_max=5,
                             stop_min=-5, stop_max=20,
                             length_min=15, length_max=35) {
-  # return plot of footprint density around start and stop codons
-  ## bam_fname: character; file.path to bam alignment file
-  ## - must contain tag.ZW from RSEM
-  ## transcript_length_fname: character; file.path to transcript lengths file
-  ## plot_title: character; plot title
-  ## start_min: integer; 5'-most position to plot, relative to start codon
-  ## start_max: integer; 3'-most position to plot, relative to start codon
-  ## stop_min: integer; 5'-most position to plot, relative to stop codon
-  ## stop_max: integer; 3'-most position to plot, relative to stop codon
-  ## length_min: integer; minimum fragment length
-  ## length_max: integer; maximum fragment length
   # load transcript lengths file
   transcript_lengths <- load_lengths(transcript_length_fname)
   # load alignment
@@ -92,17 +102,22 @@ plot_diagnostic <- function(bam_fname, transcript_length_fname, plot_title="",
   return(aggregate_plot)
 }
 
+#' Plot RPF biases
+#' 
+#' @description 
+#' This function generates `iXnos`-style plot of codon or nucleotide positional 
+#' contributions to RPF counts.
+#' 
+#' @param model_metric numeric vector; output from `evaluate_bias`
+#' @param plot_title character; title for plot
+#' @param plot_subtitle character; subtitle for plot
+#' @param type character; one of `codon` or `nt` corresponding to `model_metric`
+#' @param metric character; one of `corr` or `norm`
+#' @param fill_colors named character vector; colors corresponding to positions
+#' 
+#' @returns A ggplot object
 plot_bias <- function(model_metric, plot_title="", plot_subtitle="",
                       type="codon", metric="corr", fill_colors=NULL) {
-  # make iXnos codon correlation plots
-  ## model_metric: numeric vector; output from evaluate_bias()
-  ## plot_title: character; title for output plot
-  ## plot_subtitle: character; subtitle for output plot
-  ## type: character; one of "codon" or "nt"
-  ## metric: character; one of:
-  ##### corr: delta correlation between full model and leave-one-out model
-  ##### norm: norm of regression coefficients at that position
-  ## fill_colors: named character vector; colors corresponding positions
   if(is.null(fill_colors)) {
     fill_colors <- c(RColorBrewer::brewer.pal(4, "Set1"), "grey")
     names(fill_colors) <- c("bias", "E", "P", "A", "other")
@@ -143,12 +158,21 @@ plot_bias <- function(model_metric, plot_title="", plot_subtitle="",
   return(bias_plot)
 }
 
+#' Visualize regression coefficients
+#' 
+#' @description 
+#' This function generates either a violin plot of regression coefficient values
+#' or a volcano plot of regression coefficient values by p-value.
+#' 
+#' @param model_coefs data frame; output from `parse_coefs`
+#' @param plot_type character; one of `violin` or `volcano`
+#' @param volcano_term character; coefficient group to plot
+#' @param conf_int numeric; threshold for statistical significance
+#' @param p_adj_method character; `method` argument for `p.adjust` for multiple hypothesis correction
+#' @param p_adj_group character; one of `all` or `subset_only`
 plot_coefs <- function(model_coefs, plot_type="violin",
                        volcano_term="A", conf_int=0.95,
                        p_adj_method="fdr", p_adj_group=c("all", "subset_only")) {
-  # make violin plot of regression coefficients
-  ## model_coefs: data.frame; output of parse_coefs()
-  ## plot_type: character; one of c("violin")
   if(plot_type=="violin") {
     model_coefs <- subset(model_coefs, !is.na(model_coefs$group))
     model_coefs$group <- factor(model_coefs$group,

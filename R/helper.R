@@ -1,17 +1,32 @@
+#' Load a transcriptome lengths file
+#' @rdname load_anno
+#' 
+#' @description 
+#' `load_lengths` reads in a transcriptome lengths file
+#' 
+#' @param length_fname character; file path to transcriptome lengths file
+#' 
+#' @returns A data frame containing transcript names, 5' UTR lengths, CDS 
+#' lengths, and 3' UTR lengths
 load_lengths <- function(lengths_fname) {
-  # load transcript lengths table
-  ## length_fname: character; file path to transcript lengths file
   transcript_lengths <- read.table(lengths_fname, stringsAsFactors=F,
-                                   col.names=c("transcript", "utr5_length", "cds_length", "utr3_length"))
+                                   col.names=c("transcript", "utr5_length", 
+                                               "cds_length", "utr3_length"))
   return(transcript_lengths)
 }
 
+#' Read in a GFF file as transcriptome lengths
+#' @rdname load_anno
+#'
+#' @description
+#' `gff_to_lengths` reads in a GFF-formatted file and parse for 5' UTR, CDS, 
+#' and 3' UTR lengths. First column must be the transcript name; third column 
+#' must be one of `UTR5`, `CDS`, or `UTR3`.
+#' 
+#' @param gff_fname character; file path to GFF annotation file
+#'
+#' @returns A data frame containing transcript names, 5' UTR lengths, CDS 
 gff_to_lengths <- function(gff_fname) {
-  # load gff annotation file of gene regions
-  ## gff_fname: character; file path to gff annotation file
-  ## gff file requirements:
-  ## - first column is transcript name
-  ## - third column is one of UTR5, CDS, UTR3
   gff <- read.table(gff_fname, col.names=c("seqid", "source", "type", "start", "end",
                                            "score", "strand", "phase", "attributes"),
                     stringsAsFactors=F)
@@ -36,9 +51,17 @@ gff_to_lengths <- function(gff_fname) {
   return(transcript_lengths)
 }
 
+#' Read in a FASTA file
+#' @rdname load_anno
+#' 
+#' @description
+#' `load_fasta` reads in a FASTA-formatted file and generates a character vector
+#' of transcript sequences
+#' 
+#' @param transcript_fa_fname character; file path to transcriptome .fasta file
+#' 
+#' @returns A named numeric vector of transcript sequences
 load_fasta <- function(transcript_fa_fname) {
-  # load transcript sequences from genome .fa file
-  ## transcripts_fa_fname: character; file path to transcriptome .fa file
   transcript_sequences <- Biostrings::readDNAStringSet(transcript_fa_fname)
   transcript_sequences <- as.character(transcript_sequences)
   names(transcript_sequences) <- sapply(names(transcript_sequences),
@@ -48,20 +71,30 @@ load_fasta <- function(transcript_fa_fname) {
   return(transcript_sequences)
 }
 
+#' Write transcriptome sequence to disk
+#' 
+#' @description 
+#' Write a character vector of transcript sequences to a .fasta file. Names of 
+#' `transcript_seq` will become FASTA headers.
+#' 
+#' @param transcript_seq named character vector; file path to output .fasta file
 write_fasta <- function(transcript_seq, fa_fname) {
-  # write transcript sequence to .fa file
-  ## transcript_seq: character vector; transcript sequences
-  ### - names of transcript_seq will become header for transcript sequences
-  ## fa_fname: character; filepath to output .fa file
   transcript_seq <- Biostrings::DNAStringSet(transcript_seq)
   Biostrings::writeXStringSet(transcript_seq, fa_fname)
 }
 
+#' Load A site offset rules
+#' @rdname load_anno
+#' 
+#' @description 
+#' `load_offsets` reads in a .txt file containing A-site offset values per 
+#' RPF length and frame. Row names correspond to RPF length and column names
+#' correspond to RPF frame (named `frame_0`, `frame_1`, and `frame_2`).
+#' 
+#' @param offsets_fname character; file path to A site assignment rules .txt file
+#' 
+#' @returns A data frame in long format of A site offset values per RPF length and frame 
 load_offsets <- function(offsets_fname) {
-  # load A site offset rules
-  ## offsets_fname: character; file.path to offset / A site assignment rules .txt file
-  ## rownames: footprint length
-  ## colnames: frame (0, 1, 2)
   offsets <- read.table(offsets_fname, header=T)
   offsets <- data.frame(frame=as.vector(mapply(rep, 0:2, nrow(offsets))),
                         length=rep(as.numeric(rownames(offsets)), 3),
@@ -69,10 +102,18 @@ load_offsets <- function(offsets_fname) {
   return(offsets)
 }
 
+#' Read in transcript sequences as codons
+#' @rdname load_anno
+#' 
+#' @description 
+#' `read_fasta_as_codons` reads in a FASTA-formatted file and generates a list 
+#' of character vectors where transcript sequences have been split into codons.
+#' 
+#' @param transcript_fa_fname character; file path to transcriptome .fasta file
+#' @param transcript_length_fname character; file path to transcriptome lengths file
+#' 
+#' @returns A named list of character vectors of transcript sequences as codons
 read_fasta_as_codons <- function(transcript_fa_fname, transcript_length_fname) {
-  # read in .fasta file, convert to list of vectors of codons per transcript
-  ## transcript_fa_fname: character; file path to transcriptome .fa file
-  ## transcript_length_fname: character; file path to transcriptome lengths file
   transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_lengths <- load_lengths(transcript_length_fname)
   codon_sequences <- sapply(seq_along(transcript_seq),
@@ -93,13 +134,19 @@ read_fasta_as_codons <- function(transcript_fa_fname, transcript_length_fname) {
   return(codon_sequences)
 }
 
+#' Retrieve codons in A-, P-, and E-site positions 
+#' 
+#' @description 
+#' A function to pull codons in the A-, P-, and E-site positions of a ribosome
+#' at a position within a transcript.
+#' 
+#' @param transcript_seq named character vector; transcript (+ 5' and 3' UTR regions) sequences
+#' @param transcript_name character; one of `names(transcript_seq)`
+#' @param cod_idx integer; codon index for A-site codon (1-based)
+#' @param utr5_length integer; length of 5' UTR (in nucleotides)
+#' 
+#' @returns A named character vector
 get_codons <- function(transcript_name, cod_idx, utr5_length, transcript_seq) {
-  # return codons corresponding to A-, P-, and E-site
-  # for footprint originating from transcript_name and A site codon cod_idx
-  ## transcript_name: character; correspond to names(transcript_seq)
-  ## cod_idx: integer; codon index for A site codon
-  ## utr5_length: integer; length of 5' UTR
-  ## transcript_seq: character vector; transcript (+ 5' and 3' UTR regions) sequences
   A_start <- utr5_length + 3*(cod_idx-1) + 1
   A_end <- utr5_length + 3*cod_idx
   A_codon <- substr(transcript_seq[transcript_name], A_start, A_end)
@@ -114,15 +161,26 @@ get_codons <- function(transcript_name, cod_idx, utr5_length, transcript_seq) {
   return(codons)
 }
 
+#' Retrieve nucleotides at RPF ends
+#' 
+#' @description 
+#' A function to pull the nucleotides at the ends of a ribosome-protected 
+#' fragment, defined by ribosome position and size.
+#' 
+#' @details 
+#' If `read_type` is `monosome`, then A site codon indices should be named 
+#' `cod_idx` in `dat`. If `read_type` is `disome`, then A site codon indices 
+#' should be named `cod_idx_lagging` and `cod_idx_leading` in `dat`.
+#' 
+#' @param dat data frame containing columns `transcript`, `d5`, `d3`, `utr5_length`, and codon indices.
+#' @param transcript_seq character; output from `load_fasta`
+#' @param bias_region character; one of `f5` or `f3` corresponding to 5' or 3' bias sequence
+#' @param bias_length integer; number of nucleotides to include in bias sequence
+#' @param read_type character; one of `monosome` or `disome`
+#' 
+#' @returns A character vector corresponding to rows of `dat`
 get_bias_seq <- function(dat, transcript_seq, bias_region, bias_length=3,
                          read_type="monosome") {
-  ## dat: data.frame; contains columns c("transcript", "d5", "d3", "utr5_length")
-  ### - if read_type=="monosome", then A site codon indices are "cod_idx"
-  ### - if read_type=="disome", then A site codon indices are "cod_idx_lagging" and "cod_idx_leading"
-  ## transcript_seq: character; output from load_fasta()
-  ## bias_region: character vector; one of "f5" or "f3" (corresponding to 5' or 3' bias sequence)
-  ## bias_length: integer; length of bias sequence
-  ## read_type: character; one of "monosome" or "disome"
   ### TODO: check that read_type is valid
   if(bias_region=="f5") {
     if(read_type=="monosome") {
@@ -144,11 +202,16 @@ get_bias_seq <- function(dat, transcript_seq, bias_region, bias_length=3,
   return(bias_seq)
 }
 
+#' Convert from DNA to amino acid sequence
+#' 
+#' @description 
+#' This function extracts CDS sequence from a FASTA-formatted file, 
+#' translates DNA into amino acid sequence, and writes amino acid sequences to disk.
+#' 
+#' @param transcript_fa_fname character; file path to transcriptome .fasta (DNA) file
+#' @param transcript_length_fname character; file path to transcriptome lengths file
+#' @param output_fname character; file path for output amino acid sequences
 convert_to_aa <- function(transcript_fa_fname, transcript_length_fname, output_fname) {
-  # convert transcript sequence from DNA to amino acid
-  ## transcript_fa_fname: character; file.path to transcript fasta (DNA) file
-  ## transcript_length_fname: character; file path to transcriptome lengths file
-  ## output_fname: character; file.path to write output fasta amino acid sequences
   # 1. load in transcript DNA sequence
   transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_lengths <- load_lengths(transcript_length_fname)
@@ -169,12 +232,18 @@ convert_to_aa <- function(transcript_fa_fname, transcript_length_fname, output_f
   Biostrings::writeXStringSet(aa_seq, output_fname)
 }
 
+#' Get indices for corresponding rows in two data frames
+#' 
+#' @description 
+#' Return row indices of (first) matches of `x` in `y`
+#' 
+#' @param x data frame containing rows to find in `y`
+#' @param y data frame
+#' @param x_col character vector of columns to be used; `NULL` to use all columns
+#' @param y_col character vector of columns corresponding to `x_col`; `NULL` to use `x_col`
+#' 
+#' @returns Numeric vector corresponding to rows in `x`
 match_rows <- function(x, y, x_col=NULL, y_col=NULL) {
-  # return row numbers of (first) matches of x in y
-  ## x: data.frame
-  ## y: data.frame
-  ## x_col: character vector of columns to be used; NULL to use all columns
-  ## y_col: character vector of columns corresponding to x_col; NULL to use x_col
   if(is.null(x_col)) {
     x_col <- colnames(x)
   }
@@ -186,9 +255,16 @@ match_rows <- function(x, y, x_col=NULL, y_col=NULL) {
   match(x_terms, y_terms)
 }
 
+#' Annotate regression coefficients
+#' 
+#' @description 
+#' Extract regression coefficients from a negative binomial object and annotate
+#' coefficient types for downstream analyses.
+#' 
+#' @param nb_fit `negbin` object from `glm.nb`
+#' 
+#' @returns A data frame containing regression coefficients and corresponding annotations.
 parse_coefs <- function(nb_fit) {
-  # parse data.frame of regression coefficients for downstream analyses
-  ## nb_fit: negbin object from running glm.nb()
   regression_terms <- attributes(nb_fit$terms)$term.labels
   # 1. pull coefficients from nb_fit object
   fit_coefs <- data.frame(rownames(summary(nb_fit)$coefficient),
@@ -265,14 +341,21 @@ parse_coefs <- function(nb_fit) {
   return(fit_coefs)
 }
 
+#' Compute GC-content for a ribosome-protected fragment
+#' 
+#' @description 
+#' This function computes the GC-content of a ribosome-protected fragment, 
+#' omitting the nucleotides in the A-, P-, and/or E-site codon positions.
+#' 
+#' @param dat data frame containing columns `transcript`, `cod_idx`, `d5`, and `d3`
+#' @param omit character; one of `A`, `AP`, or `APE` corresponding to codons to omit
+#' @param transcript_fa_fname character; file path to transcriptome fasta file
+#' @param transcript_lengths_fname character; file path to transcript lengths file
+#' @param read_type character; one of `monosome` or `disome`
+#' 
+#' @returns A numeric vector corresponding to rows of `dat`
 compute_rpf_gc <- function(dat, omit="APE", transcript_fa_fname,
                            transcript_lengths_fname, read_type="monosome") {
-  # compute GC content in RPF, omitting A/P/E sites
-  # dat: data.frame; contains columns c("transcript", "cod_idx", "d5", "d3")
-  ## omit: character; which codon sites to omit, one of c("A", "AP", "APE")
-  ## transcript_fa_fname: character; file path to transcriptome fasta file
-  ## transcript_lengths_fname: character; file path to transcript lengths file
-  ## read_type: character; one of "monosome" or "disome"
   ### TODO: check whether codon index label matches read_type
   transcript_seq <- load_fasta(transcript_fa_fname)
   transcript_lengths <- load_lengths(transcript_lengths_fname)

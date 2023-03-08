@@ -24,6 +24,37 @@ RPF GC-content.
 or nucleotide position, as performed in [iXnos](http://dx.doi.org/10.1038/s41594-018-0080-2)
 to evaluate sequence biases before and after bias correction.
 
+## Installation
+
+1. Install [R](https://www.r-project.org/)
+
+2. Install dependencies
+
+Packages from CRAN:
+
+```
+install.packages(c("parallel", "doParallel", "foreach", "reshape", 
+                   "ggplot2", "MASS", "patchwork", "RColorBrewer", 
+                   "data.table", "devtools"))
+```
+
+Packages from Bioconductor:
+
+```
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("Rsamtools")
+BiocManager::install("Biostrings")
+```
+
+3. Install `choros`
+
+```
+devtools::install_github("lareaulab/choros", ref = "main",
+                         build_vignettes = TRUE)
+```
+
 ## Input files
 
 - A .bam file of alignments of pre-processed ribosome protected fragments (RPFs)

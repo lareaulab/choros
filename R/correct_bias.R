@@ -1,19 +1,19 @@
 #' Correct for sequence biases in RPF counts
-#' 
+#'
 #' @order 1
-#' 
-#' @description 
-#' `correct_bias` is a wrapper function that computes and applies bias correction factors 
+#'
+#' @description
+#' `correct_bias` is a wrapper function that computes and applies bias correction factors
 #' from extracted regression coefficients.
-#' 
+#'
 #' @param dat data frame containing regression predictors
 #' @param f5_method character; name of function to apply for 5' correction
 #' @param f3_method character; name of function to apply for 3' correction
-#' @param correct_gc logical; whether to correct for RPF %GC
-#' @param which_column character; name of column in `dat` containing uncorrected counts
+#' @param correct_gc logical; whether to correct for RPF GC-content
+#' @param which_column character; name of column in 'dat' containing uncorrected counts
 #' @param fit_coefs data frame; output from parse_coefs()
-#' 
-#' @returns A numeric vector corresponding to `dat` containing bias-corrected RPF counts
+#'
+#' @returns A numeric vector corresponding to 'dat' containing bias-corrected RPF counts
 correct_bias <- function(dat, fit_coefs, f5_method=NULL, f3_method=NULL,
                          correct_gc=T, which_column="count") {
   rpf_count <- sum(dat[, which_column], na.rm=T)
@@ -45,15 +45,15 @@ correct_bias <- function(dat, fit_coefs, f5_method=NULL, f3_method=NULL,
 
 #' @describeIn correct_bias Use simulation parameters as bias correction factors
 #' @inherit correct_bias return
-#' 
+#'
 #' @order 4
-#' 
-#' @description 
+#'
+#' @description
 #' `correct_fixed` corrects RPF counts using user-specified values; this function
 #' is intended to be used with values from a simulation experiment.
-#' 
+#'
 #' @param dat data frame containing regression predictors
-#' @param which_column character; name of column in `dat` containing uncorrected counts
+#' @param which_column character; name of column in 'dat' containing uncorrected counts
 #' @param which_region character; one of "f5" or "f3" corresponding to RPF region
 #' @param bias_params named numeric vector; recovery probabilities from simulation
 correct_fixed <- function(dat, which_column, which_region, bias_params) {
@@ -70,16 +70,16 @@ correct_fixed <- function(dat, which_column, which_region, bias_params) {
 
 #' @describeIn correct_bias Use regression coefficients as scaling factors for bias correction
 #' @inherit correct_bias return
-#' 
+#'
 #' @order 3
-#' 
-#' @description 
+#'
+#' @description
 #' `correct_marginal` corrects RPF counts using bias correction factors generated from
 #' user-provided regression coefficients; this function will ignore regression
 #' coefficients corresponding to interaction terms.
-#' 
+#'
 #' @param dat data frame containing regression predictors
-#' @param which_column character; name of column in `dat` containing uncorrected counts
+#' @param which_column character; name of column in 'dat' containing uncorrected counts
 #' @param which_region character; one of "f5" or "f3" corresponding to RPF region
 #' @param fit_coefs data frame; output from parse_coefs()
 correct_marginal <- function(dat, which_column, which_region, fit_coefs) {
@@ -96,16 +96,16 @@ correct_marginal <- function(dat, which_column, which_region, fit_coefs) {
 
 #' @describeIn correct_bias Use regression coefficients as scaling factors for bias correction
 #' @inherit correct_bias return
-#' 
+#'
 #' @order 2
-#' 
-#' @description 
+#'
+#' @description
 #' `correct_interxn` corrects RPF counts using bias correction factors generated from
 #' user-provided regression coefficients; this function will use regression
 #' coefficients corresponding to interaction terms.
-#' 
+#'
 #' @param dat data frame containing regression predictors
-#' @param which_column character; name of column in `dat` containing uncorrected counts
+#' @param which_column character; name of column in 'dat' containing uncorrected counts
 #' @param which_region character; one of "f5" or "f3" corresponding to RPF region
 #' @param fit_coefs data frame; output from parse_coefs()
 correct_interxn <- function(dat, which_column, which_region, fit_coefs) {
@@ -145,17 +145,17 @@ correct_interxn <- function(dat, which_column, which_region, fit_coefs) {
   return(corrected_count)
 }
 
-#' @describeIn correct_bias Correct for RPF %GC
+#' @describeIn correct_bias Correct for RPF GC-content
 #' @inherit correct_bias return
-#' 
+#'
 #' @order 5
-#' 
-#' @description 
-#' `correct_gc` calculates a scaling factor for RPF GC content using 
-#' user-provided regression coefficients and provide \\%GC-corrected RPF counts.
-#' 
+#'
+#' @description
+#' `correct_gc` calculates a scaling factor for RPF GC content using
+#' user-provided regression coefficients and provide GC-corrected RPF counts.
+#'
 #' @param dat data frame containing regression predictors
-#' @param which_column character; name of column in `dat` containing uncorrected counts
+#' @param which_column character; name of column in dat containing uncorrected counts
 #' @param fit_coefs data frame; output from parse_coefs()
 correct_gc <- function(dat, which_column, fit_coefs) {
   # 1. establish scaling factors

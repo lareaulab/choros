@@ -1,13 +1,22 @@
 ---
 title: "choros vignette"
-author: "Amanda Mok"
-date: "3/7/2023"
-output: html_document
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
 
 This vignette will walk through a typical `choros` analysis to format pre-processed ribosome-protected fragments (RPFs, or "footprints"), estimate sequence-based biases, and output bias-corrected footprint counts.
 
-This test dataset contains 5 highly-translated transcripts from (Tunney et al. (2018))[https://www.nature.com/articles/s41594-018-0080-2]. Whole-genome analyses can be found in the accompanying (choros paper repository)[https://github.com/lareaulab/choros_paper].
+This test dataset contains 5 highly-translated transcripts from [Tunney et al. (2018)](https://www.nature.com/articles/s41594-018-0080-2). Whole-genome analyses can be found in the accompanying [choros paper repository](https://github.com/lareaulab/choros_paper).
 
 ```{r setup}
 library(choros)
@@ -75,7 +84,7 @@ regression_model <- formula(count ~ transcript + A + P + E + d5*f5 + d3*f3 + gc)
 
 A `choros` diagnostic plot is used to determine A-site offset rules (i.e. the position of the A site within the footprint sequence, per footprint length and 5' framing).
 
-```{r diagnostic_plot}
+```{r diagnostic_plot, out.width = "100%"}
 plot_diagnostic(bam_alignment_fname, transcript_length_fname)
 ```
 
@@ -86,7 +95,8 @@ plot_diagnostic(bam_alignment_fname, transcript_length_fname)
 ```{r load_bam}
 tunney_bam <- load_bam(bam_alignment_fname, transcript_fa_fname,
                        transcript_length_fname, offsets_fname,
-                       f5_length=f5_length, f3_length=f3_length)
+                       f5_length=f5_length, f3_length=f3_length,
+                       num_cores=1)
 head(tunney_bam)
 ```
 
@@ -96,7 +106,7 @@ head(tunney_bam)
 
 `choose_subsets()` chooses the footprint lengths/frames with the most footprints that would encompass `min_prop`% of footprint counts.
 
-```{r compute_size_frame}
+```{r compute_size_frame, out.width = "100%"}
 tunney_d5_d3 <- count_d5_d3(tunney_bam)
 tunney_d5_d3$plot
 
@@ -190,6 +200,8 @@ plot_coefs(tunney_coef)
 
 Bias-correction factors are computed from regression coefficients and then applied to the observed footprint alignments, maintaining total footprint count.
 
+The data frame containing all observed footprints with their corresponding bias-corrected counts (i.e. `tunney_bam` in this vignette) can be saved for downstream analyses.
+
 ```{r correct_bias}
 tunney_bam$correct_5 <- correct_bias(tunney_bam, tunney_coef)
 tunney_training$correct_5 <- count_footprints(tunney_bam, tunney_training, "correct_5")
@@ -237,5 +249,3 @@ nt_after <- evaluate_bias(tunney_training, which_column = "correct_5",
      theme(legend.position = "none",
            axis.text.x = element_text(angle = 90, vjust = 0.5)))
 ```
-
-# 5. 

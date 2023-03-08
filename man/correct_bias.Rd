@@ -34,19 +34,19 @@ correct_gc(dat, which_column, fit_coefs)
 
 \item{f3_method}{character; name of function to apply for 3' correction}
 
-\item{correct_gc}{logical; whether to correct for RPF %GC}
+\item{correct_gc}{logical; whether to correct for RPF GC-content}
 
-\item{which_column}{character; name of column in `dat` containing uncorrected counts}
+\item{which_column}{character; name of column in dat containing uncorrected counts}
 
 \item{which_region}{character; one of "f5" or "f3" corresponding to RPF region}
 
 \item{bias_params}{named numeric vector; recovery probabilities from simulation}
 }
 \value{
-A numeric vector corresponding to `dat` containing bias-corrected RPF counts
+A numeric vector corresponding to 'dat' containing bias-corrected RPF counts
 }
 \description{
-`correct_bias` is a wrapper function that computes and applies bias correction factors 
+`correct_bias` is a wrapper function that computes and applies bias correction factors
 from extracted regression coefficients.
 
 `correct_interxn` corrects RPF counts using bias correction factors generated from
@@ -60,17 +60,17 @@ coefficients corresponding to interaction terms.
 `correct_fixed` corrects RPF counts using user-specified values; this function
 is intended to be used with values from a simulation experiment.
 
-`correct_gc` calculates a scaling factor for RPF GC content using 
-user-provided regression coefficients and provide \\%GC-corrected RPF counts.
+`correct_gc` calculates a scaling factor for RPF GC content using
+user-provided regression coefficients and provide GC-corrected RPF counts.
 }
 \section{Functions}{
 \itemize{
-\item \code{correct_interxn()}: Use regression coefficients as scaling factors for bias correction
+\item \code{correct_interxn}: Use regression coefficients as scaling factors for bias correction
 
-\item \code{correct_marginal()}: Use regression coefficients as scaling factors for bias correction
+\item \code{correct_marginal}: Use regression coefficients as scaling factors for bias correction
 
-\item \code{correct_fixed()}: Use simulation parameters as bias correction factors
+\item \code{correct_fixed}: Use simulation parameters as bias correction factors
 
-\item \code{correct_gc()}: Correct for RPF %GC
-
+\item \code{correct_gc}: Correct for RPF GC-content
 }}
+

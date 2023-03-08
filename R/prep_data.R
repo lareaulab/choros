@@ -42,7 +42,8 @@ load_bam <- function(bam_fname, transcript_fa_fname, transcript_length_fname,
   if(has_ZW_tag) {
     bam_param <- Rsamtools::ScanBamParam(what=bam_features, tag=c("ZW", "MD"))
   } else {
-    Rsamtools::ScanBamParam(what=bam_features, isUnmappedQuery=F)
+    Rsamtools::ScanBamParam(what=bam_features, # isUnmappedQuery=F,
+                            flag=scanBamFlag(isUnmappedQuery=F))
   }
   alignment <- data.frame(Rsamtools::scanBam(bam_file, param=bam_param)[[1]])
   if(!has_ZW_tag) { alignment$tag.ZW <- 1 }

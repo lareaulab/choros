@@ -27,6 +27,6 @@ count_footprints(
 A numeric vector of RPF counts corresponding to rows in `regression_data`
 }
 \description{
-This function aggregates RPF counts for a given transcript, codon position, 
+This function aggregates RPF counts for a given transcript, codon position,
 and 5' and 3' digest lengths (which correspond to an RPF length and frame).
 }

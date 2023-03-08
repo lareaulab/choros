@@ -39,11 +39,11 @@ load_bam(
 A data frame of aggregated RPF counts and annotations
 }
 \description{
-This function takes a .bam alignment file where each row corresponds to 
-an individual RPF read; generates annotations for RPF codon index, 5' 
-digest length, 3' digest length, A-/P-/E-site codons, GC content, and bias 
+This function takes a .bam alignment file where each row corresponds to
+an individual RPF read; generates annotations for RPF codon index, 5'
+digest length, 3' digest length, A-/P-/E-site codons, GC content, and bias
 sequences; filters out invalid RPFs; and aggregates identical RPFs.
 
-If `read_type` is `disome`, user must also specify `offsets_5prime_fname` 
+If `read_type` is `disome`, user must also specify `offsets_5prime_fname`
 and `offsets_3prime_fname`.
 }

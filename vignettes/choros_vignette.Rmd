@@ -1,8 +1,8 @@
 ---
-title: "choros vignette"
+title: "choros_vignette"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{choros_vignette}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -84,7 +84,7 @@ regression_model <- formula(count ~ transcript + A + P + E + d5*f5 + d3*f3 + gc)
 
 A `choros` diagnostic plot is used to determine A-site offset rules (i.e. the position of the A site within the footprint sequence, per footprint length and 5' framing).
 
-```{r diagnostic_plot, out.width = "100%"}
+```{r diagnostic_plot, fig.dim = c(8, 6)}
 plot_diagnostic(bam_alignment_fname, transcript_length_fname)
 ```
 
@@ -106,7 +106,7 @@ head(tunney_bam)
 
 `choose_subsets()` chooses the footprint lengths/frames with the most footprints that would encompass `min_prop`% of footprint counts.
 
-```{r compute_size_frame, out.width = "100%"}
+```{r compute_size_frame, fig.dim = c(8, 6)}
 tunney_d5_d3 <- count_d5_d3(tunney_bam)
 tunney_d5_d3$plot
 

@@ -1,7 +1,8 @@
 # choros
 
 choros is a software pipeline to estimate and correct the sequence biases 
-present in ribosome profiling datasets. 
+present in ribosome profiling datasets. A preprint describing the method in 
+greater detail can be found [on bioRxiv](https://doi.org/10.1101/2023.02.21.529452).
 
 Briefly, choros performs the following:
 

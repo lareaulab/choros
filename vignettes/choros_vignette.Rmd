@@ -1,0 +1,241 @@
+---
+title: "choros vignette"
+author: "Amanda Mok"
+date: "3/7/2023"
+output: html_document
+---
+
+This vignette will walk through a typical `choros` analysis to format pre-processed ribosome-protected fragments (RPFs, or "footprints"), estimate sequence-based biases, and output bias-corrected footprint counts.
+
+This test dataset contains 5 highly-translated transcripts from (Tunney et al. (2018))[https://www.nature.com/articles/s41594-018-0080-2]. Whole-genome analyses can be found in the accompanying (choros paper repository)[https://github.com/lareaulab/choros_paper].
+
+```{r setup}
+library(choros)
+```
+
+# 0. Input files and parameters
+
+## A. Input files
+
+`choros` takes the following input files:
+
+* `.bam` file of alignments of pre-processed footprints
+* `.fasta` file of transcript sequences (including 5' and 3' UTRs)
+* transcriptome lengths file containing 5' UTR, CDS, and 3' UTR lengths
+* A-site offset rules for defining the location of the A site per footprint
+* (optional) a file listing paralog groups
+
+```{r specify_inputs}
+# transcriptome-specific files
+transcript_fa_fname <- system.file("extdata", "scer.transcripts.20cds20.fa", 
+                                   package = "choros")
+transcript_length_fname <- system.file("extdata", "scer.transcripts.20cds20.lengths.txt",
+                                       package = "choros")
+transcript_lengths <- load_lengths(transcript_length_fname)
+paralogs_fname <- system.file("extdata", "scer_100_80.paralogs.id.txt",
+                              package = "choros")
+
+# experiment-specific files
+offsets_fname <- system.file("extdata", "Asite_rules.txt", package = "choros")
+bam_alignment_fname <- system.file("extdata", "tunney_footprints_top5genes.bam",
+                                   package = "choros")
+```
+
+## B. `choros` parameters
+
+Parameters for choosing genes for training/test sets:
+
+* `num_genes`: number of genes to use for regression modeling training and testing
+* `min_coverage`: minimum footprint density for genes used for model training
+* `min_nonzero`: minimum codon positions with nonzero footprint counts for genes used for model training
+
+Parameters for training `choros` model:
+
+* `min_prop`: the minimum proportion of footprints (by frame and length) to be modeled by the regression 
+* `f5_length`: number of nucleotides to be considered for 5' sequence bias
+* `f3_length`: number of nucleotides to be considered for 3' sequence bias
+* `regression_model`: formula for negative binomial regression
+
+```{r choros_parameters}
+# parameters for choosing training/test sets
+num_genes <- 250
+min_coverage <- 5
+min_nonzero <- 100
+min_prop <- 0.9
+
+# parameters for choros model
+f5_length <- 3
+f3_length <- 3
+regression_model <- formula(count ~ transcript + A + P + E + d5*f5 + d3*f3 + gc)
+```
+
+# 1. Preparing for model fitting
+
+## A. Diagnostic plot
+
+A `choros` diagnostic plot is used to determine A-site offset rules (i.e. the position of the A site within the footprint sequence, per footprint length and 5' framing).
+
+```{r diagnostic_plot}
+plot_diagnostic(bam_alignment_fname, transcript_length_fname)
+```
+
+## B. Load footprint alignment `.bam` file
+
+`load_bam()` reads in a `.bam` alignment file, reports useful statistics (ex. number of footprints with allowed lengths), and returns a data frame with each row representing an observed footprint and its count.
+
+```{r load_bam}
+tunney_bam <- load_bam(bam_alignment_fname, transcript_fa_fname,
+                       transcript_length_fname, offsets_fname,
+                       f5_length=f5_length, f3_length=f3_length)
+head(tunney_bam)
+```
+
+## C. Compute size/frame subsets to be used for modeling
+
+`count_d5_d3()` computes the proportion of footprints observed per footprint length and frame as defined allowed by A-site offset rules.
+
+`choose_subsets()` chooses the footprint lengths/frames with the most footprints that would encompass `min_prop`% of footprint counts.
+
+```{r compute_size_frame}
+tunney_d5_d3 <- count_d5_d3(tunney_bam)
+tunney_d5_d3$plot
+
+tunney_subsets <- choose_subsets(tunney_d5_d3, min_prop = min_prop)
+tunney_subsets <- tunney_subsets[, c("d5", "d3")]
+```
+
+## D. Choosing genes for training
+
+Mean footprint density (read count per codon position) and number of codon positions with non-zero read counts are used to determine which genes to use for model training nad testing.
+
+```{r compute_density}
+# per transcript: calculate mean codon coverage and number nonzero codon positions
+transcript_coverage <- calculate_transcript_density(tunney_bam,
+                                                    transcript_length_fname)
+transcript_num_nonzero <- count_nonzero_codons(tunney_bam)
+
+# check if number good transcripts sufficient for training
+good_transcripts <- data.frame(transcript=names(transcript_coverage),
+                               coverage=transcript_coverage,
+                               num_nonzero=transcript_num_nonzero[match(names(transcript_coverage),
+                                                                        names(transcript_num_nonzero))],
+                               stringsAsFactors = FALSE)
+good_transcripts <- subset(good_transcripts,
+                           coverage > min_coverage & num_nonzero > min_nonzero)
+```
+
+If lists of paralogs are provided, then only one gene per paralog group will be chosen.
+
+```{r paralogs}
+# identify paralogs
+paralogs <- readLines(paralogs_fname)
+paralogs <- strsplit(paralogs, split="\t")
+paralogs <- subset(paralogs, lengths(paralogs) > 1)
+paralogs <- data.frame(transcript=unlist(paralogs),
+                       group=unlist(mapply(rep, seq(length(paralogs)), times=lengths(paralogs))))
+good_transcripts$paralog_group <- paralogs$group[match(good_transcripts$transcript,
+                                                       paralogs$transcript)]
+
+# take top transcript by read coverage per paralog group
+paralog_groups <- split(good_transcripts, good_transcripts$paralog_group)
+paralog_groups <- lapply(paralog_groups,
+                         function(x) {
+                           if(nrow(x) == 1) { 
+                             return(x) 
+                           } else {
+                             x <- x[order(x$coverage, decreasing=T),]
+                             return(x[1, ])
+                           }
+                         })
+paralog_groups <- do.call(rbind, paralog_groups)
+good_transcripts <- rbind(subset(good_transcripts, 
+                                 is.na(good_transcripts$paralog_group)),
+                          paralog_groups)
+```
+
+Since this test data only contains 5 genes, we will use all 5 for training the regression model and omit a training/testing split. Otherwise, the top (2 * `num_genes`) genes are randomly split into training and test sets.
+
+```{r choose_training_genes}
+training_set <- good_transcripts$transcript
+```
+
+## E. Initialize data for regression model fitting
+
+A separate dataset that accounts for unobserved footprints is generated for model fitting. Observed footprint counts from the alignment `.bam` file are then filled in.
+
+```{r generate_training_data}
+tunney_training <- init_data(transcript_fa_fname, transcript_length_fname,
+                             d5_d3_subsets=tunney_subsets,
+                             f5_length=f5_length, f3_length=f3_length,
+                             which_transcripts=training_set, num_cores = 1)
+tunney_training$count <- count_footprints(tunney_bam, tunney_training, "count")
+head(tunney_training)
+```
+
+# 2. Model fitting
+
+A negative binomial regression is fit to the training data, from which regression coefficients are extracted.
+
+We have found that fitting the regression model on insufficient number of genes can lead to spuriously extreme regression coefficients. For the purposes of this test data, we will shrink those coefficients to 0 to generate usable bias correction factors.
+
+```{r fit_regression}
+tunney_fit <- glm.nb(regression_model, tunney_training)
+
+tunney_coef <- parse_coefs(tunney_fit)
+tunney_coef$estimate[abs(tunney_coef$estimate) >10] <- 0
+plot_coefs(tunney_coef)
+```
+
+# 3. Correct sequence biases
+
+Bias-correction factors are computed from regression coefficients and then applied to the observed footprint alignments, maintaining total footprint count.
+
+```{r correct_bias}
+tunney_bam$correct_5 <- correct_bias(tunney_bam, tunney_coef)
+tunney_training$correct_5 <- count_footprints(tunney_bam, tunney_training, "correct_5")
+
+head(tunney_bam)
+head(tunney_training)
+```
+
+# 4. Bias evaluation
+
+## A. Before bias correction
+
+Codon- and nucleotide-importance plots are generated to evaluate whether `choros` bias correction decreases the importance of positions at the ribosome boundary.
+
+```{r evaluate_bias_before}
+codon_before <- evaluate_bias(tunney_training, which_column = "count",
+                              transcript_fa_fname, transcript_length_fname, 
+                              type = "codon")
+nt_before <- evaluate_bias(tunney_training, which_column = "count",
+                           transcript_fa_fname, transcript_length_fname,
+                           type = "nt")
+
+(plot_bias(codon_before, type = "codon") + theme_classic() + 
+    xlab("codon position") + ggtitle("Before bias correction") + 
+    theme(legend.position = "none")) / 
+  (plot_bias(nt_before, type = "nt") + theme_classic() + 
+     xlab("nucleotide position") + 
+     theme(legend.position = "none",
+           axis.text.x = element_text(angle = 90, vjust = 0.5)))
+```
+
+```{r evaluate_bias_after}
+codon_after <- evaluate_bias(tunney_training, which_column = "correct_5",
+                              transcript_fa_fname, transcript_length_fname, 
+                              type = "codon")
+nt_after <- evaluate_bias(tunney_training, which_column = "correct_5",
+                           transcript_fa_fname, transcript_length_fname,
+                           type = "nt")
+
+(plot_bias(codon_after, type = "codon") + theme_classic() + 
+    xlab("codon position") + ggtitle("after bias correction") + 
+    theme(legend.position = "none")) / 
+  (plot_bias(nt_after, type = "nt") + theme_classic() + 
+     xlab("nucleotide position") + 
+     theme(legend.position = "none",
+           axis.text.x = element_text(angle = 90, vjust = 0.5)))
+```
+
+# 5. 

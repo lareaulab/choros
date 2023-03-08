@@ -1,0 +1,10 @@
+---
+title: "choros vignette"
+author: "Amanda Mok"
+date: "3/7/2023"
+output: html_document
+---
+
+This vignette will walk through a typical `choros` analysis to format pre-processed ribosome-protected fragments (RPFs, or "footprints"), estimate sequence-based biases, and output bias-corrected footprint counts.
+
+This test dataset contains 5 highly-translated genes from (Tunney et al. (2018))[https://www.nature.com/articles/s41594-018-0080-2]. Whole-genome analyses can be found in the accompanying (GitHub repository)[https://github.com/lareaulab/choros_paper].

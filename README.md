@@ -84,3 +84,24 @@ for example scripts.
 
 The authors additionally recommend computing posterior mapping weights for 
 multi-mapping reads with [RSEM](https://deweylab.github.io/RSEM/). 
+
+## Installation notes
+
+| | cluster | macbook pro |
+| :--- | :--- | :--- |
+| time to install | 1 min (if other dependencies are installed) | < 1 min (skipping other dependencies) |
+| time to run test data | 3 min | 3 min |
+| system version | ubuntu 18.04.5 (linux 4.15.0-141-generic) | macOS 12.3.1 |
+| R version | 3.4.4 | 4.1.2 |
+|  |  |  |
+| parallel | 3.4.4 | 4.1.2 |
+| doParallel | 1.0.17 | 1.0.17 |
+| foreach | 1.5.2 | 1.5.2 |
+| reshape | 0.8.9 | 0.8.9 |
+| Rsamtools | 1.30.0 | 2.10.0 |
+| ggplot2 | 3.3.6 | 3.4.1 |
+| MASS | 7.3-54 | 7.3-58.2 |
+| Biostrings | 2.46.0 | 2.62.0 |
+| patchwork | 1.1.1 | 1.1.2 |
+| RColorBrewer | 1.1-3 | 1.1-3 |
+| data.table | 1.14.2 | 1.14.8 |

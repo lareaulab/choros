@@ -62,6 +62,13 @@ devtools::install_github("lareaulab/choros", ref = "main",
 - A transcriptome lengths file containing 5' UTR, CDS, and 3' UTR lengths
 - An A-site offset rules file containing A-site offsets per read length and frame
 
+## Running choros
+
+A vignette showing usage and output of choros on a small sample dataset is included:
+```
+vignette("choros_vignette")
+```
+
 ## Pre-processing
 
 choros assumes that all read pre-processing steps have been performed by the 
